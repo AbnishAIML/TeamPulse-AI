@@ -18,13 +18,82 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Interceptor to handle unauthorized errors
+// Queue for pending requests during token refresh
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
+// Response interceptor with auto-refresh on 401
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401 && !window.location.pathname.includes("/login")) {
-      // Don't auto-redirect if on login
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Do not attempt refresh on auth endpoints (login, register, refresh)
+    const isAuthRoute =
+      originalRequest?.url?.includes("/auth/login") ||
+      originalRequest?.url?.includes("/auth/register") ||
+      originalRequest?.url?.includes("/auth/refresh");
+
+    if (error.response?.status === 401 && !originalRequest?._retry && !isAuthRoute) {
+      const refreshToken = localStorage.getItem("teampulse_refresh_token");
+
+      if (!refreshToken) {
+        localStorage.removeItem("teampulse_token");
+        localStorage.removeItem("teampulse_refresh_token");
+        return Promise.reject(error);
+      }
+
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return api(originalRequest);
+          })
+          .catch((err) => Promise.reject(err));
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
+          refreshToken,
+        });
+
+        const { token: newToken, refreshToken: newRefreshToken } = response.data;
+        localStorage.setItem("teampulse_token", newToken);
+        if (newRefreshToken) {
+          localStorage.setItem("teampulse_refresh_token", newRefreshToken);
+        }
+
+        api.defaults.headers.common.Authorization = `Bearer ${newToken}`;
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+
+        processQueue(null, newToken);
+        return api(originalRequest);
+      } catch (refreshErr) {
+        processQueue(refreshErr, null);
+        localStorage.removeItem("teampulse_token");
+        localStorage.removeItem("teampulse_refresh_token");
+        return Promise.reject(refreshErr);
+      } finally {
+        isRefreshing = false;
+      }
     }
+
     return Promise.reject(error);
   }
 );
@@ -32,8 +101,11 @@ api.interceptors.response.use(
 export const authAPI = {
   login: (data) => api.post("/auth/login", data),
   register: (data) => api.post("/auth/register", data),
+  refresh: (refreshToken) => api.post("/auth/refresh", { refreshToken }),
+  logout: () => api.post("/auth/logout"),
   getMe: () => api.get("/auth/me"),
   updateProfile: (data) => api.put("/auth/profile", data),
+  updatePassword: (data) => api.put("/auth/password", data),
 };
 
 export const projectsAPI = {
@@ -42,9 +114,17 @@ export const projectsAPI = {
   createProject: (data) => api.post("/projects", data),
   updateProject: (id, data) => api.put(`/projects/${id}`, data),
   deleteProject: (id) => api.delete(`/projects/${id}`),
+  
+  // Member management & Invitations
   addMember: (projectId, data) => api.post(`/projects/${projectId}/members`, data),
-  updateMemberRole: (projectId, memberId, data) => api.put(`/projects/${projectId}/members/${memberId}`, data),
-  removeMember: (projectId, memberId) => api.delete(`/projects/${projectId}/members/${memberId}`),
+  updateMemberRole: (projectId, userId, data) => api.put(`/projects/${projectId}/members/${userId}`, data),
+  removeMember: (projectId, userId) => api.delete(`/projects/${projectId}/members/${userId}`),
+  
+  // Invitations
+  createInvitation: (projectId, data) => api.post(`/projects/${projectId}/invitations`, data),
+  getInvitations: (projectId) => api.get(`/projects/${projectId}/invitations`),
+  revokeInvitation: (projectId, invitationId) => api.delete(`/projects/${projectId}/invitations/${invitationId}`),
+  acceptInvitation: (token) => api.post("/invitations/accept", { token }),
 };
 
 export const milestonesAPI = {

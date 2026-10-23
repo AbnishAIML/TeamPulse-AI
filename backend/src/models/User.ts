@@ -11,6 +11,7 @@ export interface IUser extends Document {
   weeklyCapacityHours: number;
   title: string;
   skills: string[];
+  refreshTokenHash?: string;
   comparePassword(candidate: string): Promise<boolean>;
   createdAt: Date;
   updatedAt: Date;
@@ -27,6 +28,7 @@ const UserSchema = new Schema<IUser>(
     weeklyCapacityHours: { type: Number, default: 20 },
     title: { type: String, default: "Software Engineer" },
     skills: { type: [String], default: [] },
+    refreshTokenHash: { type: String, select: false },
   },
   { timestamps: true }
 );

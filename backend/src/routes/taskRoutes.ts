@@ -10,19 +10,32 @@ import {
   deleteTask,
 } from "../controllers/taskController.js";
 import { authenticate } from "../middleware/auth.js";
-import { requireProjectMember, requireTaskMember } from "../middleware/rbac.js";
+import {
+  requireProjectMember,
+  requireTaskMember,
+  requireTaskPermission,
+} from "../middleware/rbac.js";
 
 const router = Router();
 
 router.use(authenticate);
 
+// View tasks
 router.get("/projects/:projectId/tasks", requireProjectMember, getTasks);
-router.post("/projects/:projectId/tasks", requireProjectMember, createTask);
 router.get("/tasks/:taskId", requireTaskMember, getTaskById);
-router.put("/tasks/:taskId", requireTaskMember, updateTask);
-router.patch("/tasks/:taskId/status", requireTaskMember, updateTaskStatus);
-router.post("/tasks/:taskId/blocker", requireTaskMember, reportBlocker);
-router.post("/tasks/:taskId/resolve-blocker", requireTaskMember, resolveBlocker);
-router.delete("/tasks/:taskId", requireTaskMember, deleteTask);
+
+// Create task (Owner, Manager, Member only; Reviewer forbidden)
+router.post("/projects/:projectId/tasks", requireTaskPermission("create"), createTask);
+
+// Edit task (Owner/Manager full; Member assigned only & progress fields; Reviewer forbidden)
+router.put("/tasks/:taskId", requireTaskPermission("edit"), updateTask);
+
+// Update status & blockers (Owner/Manager/Member; Reviewer forbidden)
+router.patch("/tasks/:taskId/status", requireTaskPermission("status"), updateTaskStatus);
+router.post("/tasks/:taskId/blocker", requireTaskPermission("status"), reportBlocker);
+router.post("/tasks/:taskId/resolve-blocker", requireTaskPermission("status"), resolveBlocker);
+
+// Delete task (Owner and Manager only; Member & Reviewer forbidden)
+router.delete("/tasks/:taskId", requireTaskPermission("delete"), deleteTask);
 
 export default router;

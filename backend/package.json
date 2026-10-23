@@ -10,7 +10,8 @@
     "seed": "tsx scripts/seed.demo.ts",
     "seed:demo": "tsx scripts/seed.demo.ts",
     "seed:reset": "tsx scripts/seed.reset.ts",
-    "test": "tsx tests/api.test.ts"
+    "test": "tsx tests/api.test.ts && tsx tests/stage3_rbac_transitions.test.ts",
+    "test:stage3": "tsx tests/stage3_rbac_transitions.test.ts"
   },
   "dependencies": {
     "axios": "^1.7.9",

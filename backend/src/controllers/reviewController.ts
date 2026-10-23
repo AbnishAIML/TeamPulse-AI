@@ -3,6 +3,8 @@ import { AuthenticatedRequest } from "../middleware/auth.js";
 import { Task } from "../models/Task.js";
 import { Notification } from "../models/Notification.js";
 import { Project } from "../models/Project.js";
+import { Milestone } from "../models/Milestone.js";
+import { Review } from "../models/Review.js";
 import { logActivity } from "../services/activityService.js";
 import { emitToProject, emitToUser } from "../services/socketService.js";
 
@@ -25,6 +27,15 @@ export const requestReview = async (req: AuthenticatedRequest, res: Response): P
     };
 
     await task.save();
+
+    await Review.create({
+      taskId: task._id,
+      projectId: task.projectId,
+      requestedBy: req.user!._id,
+      status: "Pending Review",
+      notes: notes || "",
+      requestedAt: new Date(),
+    });
 
     await logActivity({
       projectId: task.projectId,
@@ -88,6 +99,27 @@ export const reviewDecision = async (req: AuthenticatedRequest, res: Response): 
       return;
     }
 
+    const project = await Project.findById(task.projectId);
+    if (!project) {
+      res.status(404).json({ success: false, message: "Associated project not found." });
+      return;
+    }
+
+    const member = project.members.find((m) => m.userId.toString() === req.user!._id.toString());
+    const isOwner = project.ownerId.toString() === req.user!._id.toString();
+    const canReview =
+      req.user!.systemRole === "admin" ||
+      isOwner ||
+      (member && ["Reviewer", "Project Manager", "Project Owner"].includes(member.role));
+
+    if (!canReview) {
+      res.status(403).json({
+        success: false,
+        message: "Only Reviewers, Project Managers, and Project Owners can submit review decisions.",
+      });
+      return;
+    }
+
     task.review = {
       status: decision,
       reviewerId: req.user!._id,
@@ -105,6 +137,44 @@ export const reviewDecision = async (req: AuthenticatedRequest, res: Response): 
     }
 
     await task.save();
+
+    if (task.milestoneId) {
+      try {
+        const tasks = await Task.find({ milestoneId: task.milestoneId });
+        const total = tasks.length;
+        if (total > 0) {
+          const done = tasks.filter((t) => t.status === "Done").length;
+          const progressPct = Math.round((done / total) * 100);
+          const milestone = await Milestone.findById(task.milestoneId);
+          if (milestone) {
+            milestone.progressPct = progressPct;
+            if (progressPct === 100) {
+              milestone.status = "Completed";
+              milestone.completedAt = new Date();
+            } else if (new Date(milestone.dueDate) < new Date()) {
+              milestone.status = "Overdue";
+            } else {
+              milestone.status = "In Progress";
+            }
+            await milestone.save();
+            emitToProject(milestone.projectId.toString(), "milestone:updated", milestone);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to sync milestone progress:", err);
+      }
+    }
+
+    await Review.findOneAndUpdate(
+      { taskId: task._id, status: "Pending Review" },
+      {
+        reviewer: req.user!._id,
+        status: decision,
+        feedback: feedback || "",
+        decidedAt: new Date(),
+      },
+      { sort: { requestedAt: -1 } }
+    );
 
     const eventType = decision === "Approved" ? "REVIEW_APPROVED" : "REVIEW_REJECTED";
     await logActivity({

@@ -2,6 +2,7 @@ import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import { Task } from "../models/Task.js";
 import { Project } from "../models/Project.js";
+import { TaskDependency } from "../models/TaskDependency.js";
 import { AnalyticsBridge } from "../services/analyticsBridge.js";
 import { logActivity } from "../services/activityService.js";
 import { emitToProject } from "../services/socketService.js";
@@ -58,7 +59,7 @@ export const addDependency = async (req: AuthenticatedRequest, res: Response): P
     }
 
     if (taskId === predecessorId) {
-      res.status(400).json({ success: false, message: "A task cannot depend on itself." });
+      res.status(422).json({ success: false, message: "A task cannot depend on itself." });
       return;
     }
 
@@ -96,7 +97,7 @@ export const addDependency = async (req: AuthenticatedRequest, res: Response): P
 
     const check = await AnalyticsBridge.analyzeDependencies(task.projectId.toString(), simulatedPayloads);
     if (check.has_cycle) {
-      res.status(400).json({
+      res.status(422).json({
         success: false,
         message: `Dependency rejected: creates a circular cycle (${check.cycle_nodes.join(" ➔ ")})`,
         cycleNodes: check.cycle_nodes,
@@ -106,6 +107,12 @@ export const addDependency = async (req: AuthenticatedRequest, res: Response): P
 
     task.dependencies.push(predTask._id as any);
     await task.save();
+
+    await TaskDependency.findOneAndUpdate(
+      { projectId: task.projectId, predecessorId: predTask._id, successorId: task._id },
+      { projectId: task.projectId, predecessorId: predTask._id, successorId: task._id },
+      { upsert: true }
+    );
 
     await logActivity({
       projectId: task.projectId,
@@ -143,6 +150,11 @@ export const removeDependency = async (req: AuthenticatedRequest, res: Response)
 
     task.dependencies = task.dependencies.filter((d) => d.toString() !== predecessorId);
     await task.save();
+
+    await TaskDependency.findOneAndDelete({
+      predecessorId,
+      successorId: taskId,
+    });
 
     await logActivity({
       projectId: task.projectId,

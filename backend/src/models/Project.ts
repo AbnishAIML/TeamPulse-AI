@@ -7,6 +7,15 @@ export interface IProjectMember {
   role: ProjectRole;
   joinedAt: Date;
   weeklyCapacityHours?: number;
+  skills?: string[];
+}
+
+export interface IProjectSettings {
+  requireReviewForDone: boolean;
+  productiveHoursPerDay: number;
+  workingDays: number[];
+  overloadThresholdPct: number;
+  underloadThresholdPct: number;
 }
 
 export interface IProject extends Document {
@@ -19,6 +28,7 @@ export interface IProject extends Document {
   status: "Planning" | "Active" | "On Hold" | "Completed" | "Archived";
   ownerId: Types.ObjectId;
   members: IProjectMember[];
+  settings: IProjectSettings;
   isArchived: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -34,6 +44,18 @@ const ProjectMemberSchema = new Schema<IProjectMember>(
     },
     joinedAt: { type: Date, default: Date.now },
     weeklyCapacityHours: { type: Number, default: 20 },
+    skills: { type: [String], default: [] },
+  },
+  { _id: false }
+);
+
+const ProjectSettingsSchema = new Schema<IProjectSettings>(
+  {
+    requireReviewForDone: { type: Boolean, default: false },
+    productiveHoursPerDay: { type: Number, default: 6 },
+    workingDays: { type: [Number], default: [1, 2, 3, 4, 5] },
+    overloadThresholdPct: { type: Number, default: 100 },
+    underloadThresholdPct: { type: Number, default: 40 },
   },
   { _id: false }
 );
@@ -53,6 +75,16 @@ const ProjectSchema = new Schema<IProject>(
     },
     ownerId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     members: { type: [ProjectMemberSchema], default: [] },
+    settings: {
+      type: ProjectSettingsSchema,
+      default: () => ({
+        requireReviewForDone: false,
+        productiveHoursPerDay: 6,
+        workingDays: [1, 2, 3, 4, 5],
+        overloadThresholdPct: 100,
+        underloadThresholdPct: 40,
+      }),
+    },
     isArchived: { type: Boolean, default: false },
   },
   { timestamps: true }

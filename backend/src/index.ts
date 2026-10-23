@@ -21,6 +21,7 @@ import reviewRoutes from "./routes/reviewRoutes.js";
 import attachmentRoutes from "./routes/attachmentRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
+import invitationRoutes from "./routes/invitationRoutes.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -60,6 +61,7 @@ app.use("/api", reviewRoutes);
 app.use("/api", attachmentRoutes);
 app.use("/api", notificationRoutes);
 app.use("/api", reportRoutes);
+app.use("/api/invitations", invitationRoutes);
 
 // Centralized error handler
 app.use(errorHandler);

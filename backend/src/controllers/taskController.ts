@@ -2,9 +2,63 @@ import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import { Task, TaskStatus } from "../models/Task.js";
 import { Project } from "../models/Project.js";
+import { Milestone } from "../models/Milestone.js";
 import { Notification } from "../models/Notification.js";
+import { TaskDependency } from "../models/TaskDependency.js";
+import { Review } from "../models/Review.js";
 import { logActivity } from "../services/activityService.js";
 import { emitToProject, emitToUser } from "../services/socketService.js";
+
+const VALID_STATUSES: TaskStatus[] = [
+  "Backlog",
+  "To Do",
+  "In Progress",
+  "In Review",
+  "Blocked",
+  "Done",
+];
+
+const syncMilestoneProgress = async (milestoneId?: any): Promise<void> => {
+  if (!milestoneId) return;
+  try {
+    const tasks = await Task.find({ milestoneId });
+    const total = tasks.length;
+    if (total === 0) return;
+
+    const done = tasks.filter((t) => t.status === "Done").length;
+    const progressPct = Math.round((done / total) * 100);
+
+    const milestone = await Milestone.findById(milestoneId);
+    if (!milestone) return;
+
+    milestone.progressPct = progressPct;
+    if (progressPct === 100) {
+      milestone.status = "Completed";
+      milestone.completedAt = new Date();
+    } else if (new Date(milestone.dueDate) < new Date()) {
+      milestone.status = "Overdue";
+    } else {
+      milestone.status = "In Progress";
+    }
+
+    await milestone.save();
+    emitToProject(milestone.projectId.toString(), "milestone:updated", milestone);
+  } catch (err) {
+    console.warn("Failed to sync milestone progress:", err);
+  }
+};
+
+const getPredecessorTasks = async (taskId: string, explicitDeps: any[] = []): Promise<any[]> => {
+  const depDocs = await TaskDependency.find({ successorId: taskId });
+  const allPredIds = Array.from(
+    new Set([
+      ...explicitDeps.map((d: any) => d._id?.toString() || d.toString()),
+      ...depDocs.map((d) => d.predecessorId.toString()),
+    ])
+  );
+  if (allPredIds.length === 0) return [];
+  return Task.find({ _id: { $in: allPredIds } });
+};
 
 export const getTasks = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
@@ -60,9 +114,11 @@ export const getTaskById = async (req: AuthenticatedRequest, res: Response): Pro
       return;
     }
 
-    // Find successor tasks (tasks that have this task in their dependencies)
-    const successors = await Task.find({ dependencies: task._id }, "title status priority deadline assigneeId")
-      .populate("assigneeId", "name initials avatarColor");
+    // Find successor tasks
+    const successors = await Task.find(
+      { dependencies: task._id },
+      "title status priority deadline assigneeId"
+    ).populate("assigneeId", "name initials avatarColor");
 
     res.json({ success: true, task, successors });
   } catch (error: any) {
@@ -92,14 +148,23 @@ export const createTask = async (req: AuthenticatedRequest, res: Response): Prom
       return;
     }
 
+    const initialStatus: TaskStatus = status || "To Do";
+    if (!VALID_STATUSES.includes(initialStatus)) {
+      res.status(422).json({
+        success: false,
+        message: `Invalid status '${initialStatus}'. Allowed: ${VALID_STATUSES.join(", ")}`,
+      });
+      return;
+    }
+
     const task = await Task.create({
       projectId,
-      title,
+      title: title.trim(),
       description: description || "",
       assigneeId: assigneeId || undefined,
       milestoneId: milestoneId || undefined,
       priority: priority || "Medium",
-      status: status || "To Do",
+      status: initialStatus,
       startDate: startDate ? new Date(startDate) : new Date(),
       deadline: deadline ? new Date(deadline) : undefined,
       estimatedHours: estimatedHours ? Number(estimatedHours) : 4,
@@ -107,6 +172,19 @@ export const createTask = async (req: AuthenticatedRequest, res: Response): Prom
       dependencies: Array.isArray(dependencies) ? dependencies : [],
       tags: Array.isArray(tags) ? tags : [],
     });
+
+    // Sync dependencies into TaskDependency collection
+    if (Array.isArray(dependencies) && dependencies.length > 0) {
+      for (const predId of dependencies) {
+        await TaskDependency.findOneAndUpdate(
+          { projectId, predecessorId: predId, successorId: task._id },
+          { projectId, predecessorId: predId, successorId: task._id },
+          { upsert: true }
+        );
+      }
+    }
+
+    await syncMilestoneProgress(task.milestoneId);
 
     const populatedTask = await Task.findById(task._id)
       .populate("assigneeId", "name email initials avatarColor")
@@ -152,9 +230,71 @@ export const updateTask = async (req: AuthenticatedRequest, res: Response): Prom
       return;
     }
 
-    const previousAssignee = task.assigneeId?.toString();
+    // Check status transition validity if status is being updated
+    if (updates.status && updates.status !== task.status) {
+      const newStatus: TaskStatus = updates.status;
+      if (!VALID_STATUSES.includes(newStatus)) {
+        res.status(422).json({
+          success: false,
+          message: `Invalid status '${newStatus}'. Allowed: ${VALID_STATUSES.join(", ")}`,
+        });
+        return;
+      }
 
-    if (updates.title) task.title = updates.title;
+      // Predecessor check for In Progress
+      if (newStatus === "In Progress") {
+        const predecessors = await getPredecessorTasks(taskId, task.dependencies);
+        const blockedPred = predecessors.find((p) => p.status !== "Done");
+        if (blockedPred) {
+          res.status(422).json({
+            success: false,
+            message: `Cannot start task: blocked by predecessor task '${blockedPred.title}'`,
+          });
+          return;
+        }
+      }
+
+      // Done transition checks
+      if (newStatus === "Done") {
+        const project = await Project.findById(task.projectId);
+        if (project?.settings?.requireReviewForDone) {
+          const approvedReview =
+            task.review?.status === "Approved" ||
+            (await Review.findOne({ taskId: task._id, status: "Approved" }));
+          if (!approvedReview) {
+            res.status(422).json({
+              success: false,
+              message: "Task requires approved review before moving to Done",
+            });
+            return;
+          }
+        }
+
+        const predecessors = await getPredecessorTasks(taskId, task.dependencies);
+        const unfinished = predecessors.find((p) => p.status !== "Done");
+        if (unfinished) {
+          res.status(422).json({
+            success: false,
+            message: `Cannot mark task as Done: Predecessor task '${unfinished.title}' is not yet completed.`,
+          });
+          return;
+        }
+
+        task.remainingHours = 0;
+        task.completedAt = new Date();
+        if (task.blocker?.isBlocked) {
+          task.blocker.isBlocked = false;
+          task.blocker.resolvedAt = new Date();
+        }
+      }
+
+      task.status = newStatus;
+    }
+
+    const previousAssignee = task.assigneeId?.toString();
+    const oldMilestoneId = task.milestoneId?.toString();
+
+    if (updates.title) task.title = updates.title.trim();
     if (updates.description !== undefined) task.description = updates.description;
     if (updates.priority) task.priority = updates.priority;
     if (updates.startDate) task.startDate = new Date(updates.startDate);
@@ -164,8 +304,8 @@ export const updateTask = async (req: AuthenticatedRequest, res: Response): Prom
     if (updates.actualHours !== undefined) task.actualHours = Number(updates.actualHours);
     if (updates.tags && Array.isArray(updates.tags)) task.tags = updates.tags;
     if (updates.milestoneId !== undefined) task.milestoneId = updates.milestoneId || undefined;
+
     if (updates.dependencies && Array.isArray(updates.dependencies)) {
-      // Prevent self dependency
       task.dependencies = updates.dependencies.filter((d: string) => d !== taskId);
     }
 
@@ -194,6 +334,11 @@ export const updateTask = async (req: AuthenticatedRequest, res: Response): Prom
 
     await task.save();
 
+    await syncMilestoneProgress(task.milestoneId);
+    if (oldMilestoneId && oldMilestoneId !== task.milestoneId?.toString()) {
+      await syncMilestoneProgress(oldMilestoneId);
+    }
+
     const populated = await Task.findById(task._id)
       .populate("assigneeId", "name email initials avatarColor")
       .populate("milestoneId", "title dueDate status")
@@ -212,36 +357,56 @@ export const updateTaskStatus = async (req: AuthenticatedRequest, res: Response)
     const { taskId } = req.params;
     const { status } = req.body as { status: TaskStatus };
 
-    const task = await Task.findById(taskId).populate("dependencies");
+    if (!VALID_STATUSES.includes(status)) {
+      res.status(422).json({
+        success: false,
+        message: `Invalid status '${status}'. Allowed: ${VALID_STATUSES.join(", ")}`,
+      });
+      return;
+    }
+
+    const task = await Task.findById(taskId);
     if (!task) {
       res.status(404).json({ success: false, message: "Task not found." });
       return;
     }
 
-    // State transition validation rule:
-    // If marking as Done, check if review was required and changes are requested or review is pending
-    if (status === "Done") {
-      if (task.review?.status === "Pending Review") {
-        res.status(400).json({
+    // Rule: Transition into In Progress requires all finish-to-start predecessors to be Done
+    if (status === "In Progress") {
+      const predecessors = await getPredecessorTasks(taskId, task.dependencies);
+      const blockedPred = predecessors.find((p) => p.status !== "Done");
+      if (blockedPred) {
+        res.status(422).json({
           success: false,
-          message: "Cannot mark task as Done: Task is currently awaiting review sign-off.",
+          message: `Cannot start task: blocked by predecessor task '${blockedPred.title}'`,
         });
         return;
       }
-      if (task.review?.status === "Changes Requested") {
-        res.status(400).json({
-          success: false,
-          message: "Cannot mark task as Done: Changes were requested during review and have not been re-approved.",
-        });
-        return;
+    }
+
+    // Rule: Transition into Done
+    if (status === "Done") {
+      const project = await Project.findById(task.projectId);
+      if (project?.settings?.requireReviewForDone) {
+        const approvedReview =
+          task.review?.status === "Approved" ||
+          (await Review.findOne({ taskId: task._id, status: "Approved" }));
+        if (!approvedReview) {
+          res.status(422).json({
+            success: false,
+            message: "Task requires approved review before moving to Done",
+          });
+          return;
+        }
       }
 
       // Check for unfinished dependencies
-      const unfinishedPreds = (task.dependencies as any[]).filter((d) => d.status !== "Done");
-      if (unfinishedPreds.length > 0) {
-        res.status(400).json({
+      const predecessors = await getPredecessorTasks(taskId, task.dependencies);
+      const unfinishedPred = predecessors.find((d) => d.status !== "Done");
+      if (unfinishedPred) {
+        res.status(422).json({
           success: false,
-          message: `Cannot mark task as Done: Predecessor task '${unfinishedPreds[0].title}' is not yet completed.`,
+          message: `Cannot mark task as Done: Predecessor task '${unfinishedPred.title}' is not yet completed.`,
         });
         return;
       }
@@ -257,6 +422,8 @@ export const updateTaskStatus = async (req: AuthenticatedRequest, res: Response)
     const previousStatus = task.status;
     task.status = status;
     await task.save();
+
+    await syncMilestoneProgress(task.milestoneId);
 
     await logActivity({
       projectId: task.projectId,
@@ -392,9 +559,19 @@ export const deleteTask = async (req: AuthenticatedRequest, res: Response): Prom
     }
 
     const projectId = task.projectId.toString();
-    // Remove dependency references in other tasks
+    const milestoneId = task.milestoneId?.toString();
+
+    // Remove dependency references
     await Task.updateMany({ dependencies: taskId }, { $pull: { dependencies: taskId } });
+    await TaskDependency.deleteMany({
+      $or: [{ predecessorId: taskId }, { successorId: taskId }],
+    });
+
     await Task.findByIdAndDelete(taskId);
+
+    if (milestoneId) {
+      await syncMilestoneProgress(milestoneId);
+    }
 
     emitToProject(projectId, "task:deleted", { taskId });
 
