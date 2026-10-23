@@ -149,6 +149,7 @@ export const dependenciesAPI = {
   getDependencies: (projectId) => api.get(`/projects/${projectId}/dependencies`),
   addDependency: (taskId, predecessorId) => api.post(`/tasks/${taskId}/dependencies`, { predecessorId }),
   removeDependency: (taskId, predecessorId) => api.delete(`/tasks/${taskId}/dependencies/${predecessorId}`),
+  simulateDelay: (projectId, data) => api.post(`/projects/${projectId}/dependencies/simulate-delay`, data),
 };
 
 export const workloadAPI = {

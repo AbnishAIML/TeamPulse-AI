@@ -543,15 +543,14 @@ export default function TasksPage({ onOpenCreateTask, showCreateModal, setShowCr
                           t.status === "Done"
                             ? "#1c4038"
                             : t.status === "Blocked"
-                            ? "#4a293b"
-                            : "#2f2752",
-                        border: `1px solid ${
-                          t.status === "Done"
+                              ? "#4a293b"
+                              : "#2f2752",
+                        border: `1px solid ${t.status === "Done"
                             ? "#72dcb5"
                             : t.status === "Blocked"
-                            ? "#ff8c9c"
-                            : "#9b8cff"
-                        }`,
+                              ? "#ff8c9c"
+                              : "#9b8cff"
+                          }`,
                         borderRadius: "6px",
                         display: "flex",
                         alignItems: "center",

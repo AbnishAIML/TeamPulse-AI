@@ -11,6 +11,7 @@ import LandingPage from "./pages/LandingPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import RegisterPage from "./pages/RegisterPage.jsx";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
+import AcceptInvitePage from "./pages/AcceptInvitePage.jsx";
 import NotFoundPage from "./pages/NotFoundPage.jsx";
 
 // Workspace Pages
@@ -181,6 +182,7 @@ export default function App() {
         element={user ? <Navigate to="/dashboard" replace /> : <RegisterPage />}
       />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/invite" element={<AcceptInvitePage />} />
 
       {/* Protected Dashboard Area */}
       <Route
