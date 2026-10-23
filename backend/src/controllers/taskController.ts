@@ -257,6 +257,16 @@ export const updateTask = async (req: AuthenticatedRequest, res: Response): Prom
 
       // Done transition checks
       if (newStatus === "Done") {
+        const predecessors = await getPredecessorTasks(taskId, task.dependencies);
+        const unfinished = predecessors.find((p) => p.status !== "Done");
+        if (unfinished) {
+          res.status(422).json({
+            success: false,
+            message: `Finish-to-Start dependency violation: Predecessor task '${unfinished.title}' is not yet completed.`,
+          });
+          return;
+        }
+
         const project = await Project.findById(task.projectId);
         if (project?.settings?.requireReviewForDone) {
           const approvedReview =
@@ -265,20 +275,10 @@ export const updateTask = async (req: AuthenticatedRequest, res: Response): Prom
           if (!approvedReview) {
             res.status(422).json({
               success: false,
-              message: "Task requires approved review before moving to Done",
+              message: "Review required: Task requires approved review before moving to Done",
             });
             return;
           }
-        }
-
-        const predecessors = await getPredecessorTasks(taskId, task.dependencies);
-        const unfinished = predecessors.find((p) => p.status !== "Done");
-        if (unfinished) {
-          res.status(422).json({
-            success: false,
-            message: `Cannot mark task as Done: Predecessor task '${unfinished.title}' is not yet completed.`,
-          });
-          return;
         }
 
         task.remainingHours = 0;
@@ -387,6 +387,18 @@ export const updateTaskStatus = async (req: AuthenticatedRequest, res: Response)
 
     // Rule: Transition into Done
     if (status === "Done") {
+      // Check for unfinished dependencies (predecessors)
+      const predecessors = await getPredecessorTasks(taskId, task.dependencies);
+      const unfinishedPred = predecessors.find((d) => d.status !== "Done");
+      if (unfinishedPred) {
+        res.status(422).json({
+          success: false,
+          message: `Finish-to-Start dependency violation: Predecessor task '${unfinishedPred.title}' is not yet completed.`,
+        });
+        return;
+      }
+
+      // Check quality gate: requireReviewForDone
       const project = await Project.findById(task.projectId);
       if (project?.settings?.requireReviewForDone) {
         const approvedReview =
@@ -395,21 +407,10 @@ export const updateTaskStatus = async (req: AuthenticatedRequest, res: Response)
         if (!approvedReview) {
           res.status(422).json({
             success: false,
-            message: "Task requires approved review before moving to Done",
+            message: "Review required: Task requires approved peer review before moving to Done",
           });
           return;
         }
-      }
-
-      // Check for unfinished dependencies
-      const predecessors = await getPredecessorTasks(taskId, task.dependencies);
-      const unfinishedPred = predecessors.find((d) => d.status !== "Done");
-      if (unfinishedPred) {
-        res.status(422).json({
-          success: false,
-          message: `Cannot mark task as Done: Predecessor task '${unfinishedPred.title}' is not yet completed.`,
-        });
-        return;
       }
 
       task.remainingHours = 0;

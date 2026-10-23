@@ -10,6 +10,10 @@ import {
   ArrowRight,
   ShieldAlert,
   Flame,
+  Play,
+  X,
+  Activity,
+  Layers,
 } from "lucide-react";
 import { dependenciesAPI, tasksAPI } from "../services/api.js";
 import { useProject } from "../context/ProjectContext.jsx";
@@ -24,6 +28,13 @@ export default function DependenciesPage() {
   const [selectedPredId, setSelectedPredId] = useState("");
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
+
+  // Delay Simulation State
+  const [showSimModal, setShowSimModal] = useState(false);
+  const [simTaskId, setSimTaskId] = useState("");
+  const [simHours, setSimHours] = useState(16);
+  const [simulating, setSimulating] = useState(false);
+  const [simResult, setSimResult] = useState(null);
 
   const showToast = (msg) => {
     setToast(msg);
@@ -86,6 +97,26 @@ export default function DependenciesPage() {
     }
   };
 
+  const handleRunSimulation = async (e) => {
+    e.preventDefault();
+    if (!simTaskId || !simHours) return;
+    setSimulating(true);
+    try {
+      const res = await dependenciesAPI.simulateDelay(activeProject._id, {
+        delayedTaskId: simTaskId,
+        delayHours: Number(simHours),
+      });
+      if (res.data.success) {
+        setSimResult(res.data.simulation);
+        showToast("Delay propagation simulation complete!");
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || "Simulation failed.");
+    } finally {
+      setSimulating(false);
+    }
+  };
+
   const criticalPathSet = new Set(data?.critical_path || []);
 
   return (
@@ -102,6 +133,18 @@ export default function DependenciesPage() {
           </p>
         </div>
         <div className="heading-actions">
+          <button
+            className="button-secondary"
+            onClick={() => {
+              setShowSimModal(true);
+              setSimResult(null);
+              if (tasks.length > 0 && !simTaskId) {
+                setSimTaskId(tasks[0]._id);
+              }
+            }}
+          >
+            <Play size={14} /> What-If Delay Simulation
+          </button>
           <button className="button-primary" onClick={() => setShowAddModal(true)}>
             <Plus size={16} /> Link Dependency
           </button>
@@ -468,6 +511,244 @@ export default function DependenciesPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* What-If Delay Propagation Simulation Modal */}
+      {showSimModal && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={(e) => e.target === e.currentTarget && setShowSimModal(false)}
+        >
+          <div
+            className="task-modal"
+            style={{ width: "min(100%, 580px)", maxHeight: "90vh", overflowY: "auto" }}
+          >
+            <div className="modal-head">
+              <div>
+                <span className="modal-kicker">PREDICTIVE ANALYTICS</span>
+                <h2>What-If Delay Propagation</h2>
+                <p>Simulate schedule slippage, critical path shifts, and cascading downstream delays.</p>
+              </div>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setShowSimModal(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleRunSimulation} style={{ marginBottom: "20px" }}>
+              <label className="form-label">
+                Select Task to Delay
+                <select
+                  value={simTaskId}
+                  onChange={(e) => setSimTaskId(e.target.value)}
+                  required
+                >
+                  <option value="">Select a task...</option>
+                  {tasks.map((t) => (
+                    <option key={t._id} value={t._id}>
+                      {t.title} ({t.status} &bull; {t.estimatedHours || 0}h)
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="form-label">
+                Hypothetical Delay (Hours)
+                <input
+                  type="number"
+                  min="1"
+                  max="500"
+                  value={simHours}
+                  onChange={(e) => setSimHours(e.target.value)}
+                  required
+                />
+              </label>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                <button
+                  type="button"
+                  className="button-secondary"
+                  onClick={() => setShowSimModal(false)}
+                >
+                  Close
+                </button>
+                <button type="submit" className="button-primary" disabled={simulating || !simTaskId}>
+                  {simulating ? "Simulating..." : "Run Simulation"}
+                </button>
+              </div>
+            </form>
+
+            {/* Simulation Results Display */}
+            {simResult && (
+              <div
+                style={{
+                  background: "#111729",
+                  border: "1px solid #232c44",
+                  borderRadius: "12px",
+                  padding: "16px",
+                }}
+              >
+                <h3
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    color: "#9b8cff",
+                    margin: "0 0 12px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <Activity size={14} /> Simulation Outcome
+                </h3>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, 1fr)",
+                    gap: "10px",
+                    marginBottom: "16px",
+                  }}
+                >
+                  <div
+                    style={{
+                      background: "#181f33",
+                      padding: "10px",
+                      borderRadius: "8px",
+                      border: "1px solid #2a344d",
+                    }}
+                  >
+                    <span style={{ fontSize: "9px", color: "#818ba5", display: "block" }}>
+                      Project Slippage
+                    </span>
+                    <strong
+                      style={{
+                        fontSize: "16px",
+                        color:
+                          (simResult.schedule_slippage_hours ?? simResult.project_schedule_slippage_hours ?? 0) > 0
+                            ? "#ff8c9c"
+                            : "#56d5ad",
+                      }}
+                    >
+                      +{(simResult.schedule_slippage_hours ?? simResult.project_schedule_slippage_hours ?? 0)}h
+                    </strong>
+                  </div>
+
+                  <div
+                    style={{
+                      background: "#181f33",
+                      padding: "10px",
+                      borderRadius: "8px",
+                      border: "1px solid #2a344d",
+                    }}
+                  >
+                    <span style={{ fontSize: "9px", color: "#818ba5", display: "block" }}>
+                      New Duration
+                    </span>
+                    <strong style={{ fontSize: "16px", color: "#e8ebf5" }}>
+                      {simResult.new_duration_hours ?? simResult.new_project_duration_hours ?? 0}h
+                    </strong>
+                    <div style={{ fontSize: "9px", color: "#818ba5" }}>
+                      from {simResult.original_duration_hours ?? simResult.baseline_duration_hours ?? 0}h
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: "#181f33",
+                      padding: "10px",
+                      borderRadius: "8px",
+                      border: "1px solid #2a344d",
+                    }}
+                  >
+                    <span style={{ fontSize: "9px", color: "#818ba5", display: "block" }}>
+                      Critical Path
+                    </span>
+                    <strong
+                      style={{
+                        fontSize: "12px",
+                        color: simResult.critical_path_changed ? "#ffbd7c" : "#9b8cff",
+                        display: "block",
+                        marginTop: "4px",
+                      }}
+                    >
+                      {simResult.critical_path_changed ? "Shifted" : "Maintained"}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Cascading Downstream Tasks */}
+                <div>
+                  {(() => {
+                    const affected = simResult.affected_tasks ?? simResult.cascade_affected_tasks ?? [];
+                    return (
+                      <>
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.8px",
+                            color: "#818ba5",
+                            display: "block",
+                            marginBottom: "8px",
+                          }}
+                        >
+                          Cascading Downstream Impact ({affected.length} Tasks)
+                        </span>
+
+                        {affected.length > 0 ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                            {affected.map((c, i) => (
+                              <div
+                                key={i}
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  background: "#0d1324",
+                                  border: "1px solid #20283b",
+                                  padding: "8px 12px",
+                                  borderRadius: "6px",
+                                  fontSize: "11px",
+                                }}
+                              >
+                                <span style={{ color: "#e8ebf5" }}>{c.task_title || c.task_id}</span>
+                                <div style={{ display: "flex", gap: "10px", fontSize: "10px" }}>
+                                  <span style={{ color: "#ff8c9c" }}>
+                                    +{(c.delay_shift_hours ?? c.additional_delay_hours ?? 0)}h delay
+                                  </span>
+                                  {c.new_slack !== undefined && (
+                                    <span style={{ color: "#818ba5" }}>Slack: {c.new_slack}h</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              fontSize: "11px",
+                              color: "#56d5ad",
+                              background: "#132321",
+                              padding: "8px 12px",
+                              borderRadius: "6px",
+                            }}
+                          >
+                            No downstream tasks are blocked by this delay (absorbed by task float/slack).
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
