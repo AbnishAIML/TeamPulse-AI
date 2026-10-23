@@ -106,6 +106,8 @@ export const authAPI = {
   getMe: () => api.get("/auth/me"),
   updateProfile: (data) => api.put("/auth/profile", data),
   updatePassword: (data) => api.put("/auth/password", data),
+  forgotPassword: (email) => api.post("/auth/forgot-password", { email }),
+  resetPassword: (token, newPassword) => api.post("/auth/reset-password", { token, newPassword }),
 };
 
 export const projectsAPI = {
@@ -124,6 +126,7 @@ export const projectsAPI = {
   createInvitation: (projectId, data) => api.post(`/projects/${projectId}/invitations`, data),
   getInvitations: (projectId) => api.get(`/projects/${projectId}/invitations`),
   revokeInvitation: (projectId, invitationId) => api.delete(`/projects/${projectId}/invitations/${invitationId}`),
+  regenerateInvitation: (projectId, invitationId) => api.post(`/projects/${projectId}/invitations/${invitationId}/regenerate`),
   acceptInvitation: (token) => api.post("/invitations/accept", { token }),
 };
 
@@ -180,6 +183,7 @@ export const attachmentsAPI = {
       headers: { "Content-Type": "multipart/form-data" },
     }),
   getDownloadUrl: (attachmentId) => `${API_BASE_URL}/attachments/${attachmentId}/download`,
+  deleteAttachment: (attachmentId) => api.delete(`/attachments/${attachmentId}`),
 };
 
 export const notificationsAPI = {

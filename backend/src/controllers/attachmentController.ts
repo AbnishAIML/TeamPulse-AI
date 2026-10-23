@@ -96,3 +96,53 @@ export const downloadAttachment = async (req: AuthenticatedRequest, res: Respons
     res.status(500).json({ success: false, message: "Failed to download attachment.", error: error.message });
   }
 };
+
+export const deleteAttachment = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { attachmentId } = req.params;
+
+    const attachment = await Attachment.findById(attachmentId);
+    if (!attachment) {
+      res.status(404).json({ success: false, message: "Attachment not found." });
+      return;
+    }
+
+    const project = await Project.findById(attachment.projectId);
+    if (!project) {
+      res.status(404).json({ success: false, message: "Associated project not found." });
+      return;
+    }
+
+    // Requester must be uploader, project owner, or project manager
+    const isUploader = attachment.uploaderId.toString() === req.user!._id.toString();
+    const isOwner = project.ownerId.toString() === req.user!._id.toString();
+    const isManager = project.members.some(
+      (m) => m.userId.toString() === req.user!._id.toString() && (m.role === "Project Owner" || m.role === "Project Manager")
+    );
+
+    if (!isUploader && !isOwner && !isManager && req.user!.systemRole !== "admin") {
+      res.status(403).json({ success: false, message: "You are not authorized to delete this attachment." });
+      return;
+    }
+
+    // Safely remove file on disk if present
+    if (fs.existsSync(attachment.filePath)) {
+      try {
+        fs.unlinkSync(attachment.filePath);
+      } catch (fileErr) {
+        console.warn("Could not remove file on disk:", fileErr);
+      }
+    }
+
+    await Attachment.findByIdAndDelete(attachmentId);
+
+    emitToProject(attachment.projectId.toString(), "attachment:deleted", {
+      attachmentId,
+      taskId: attachment.taskId,
+    });
+
+    res.json({ success: true, message: "Attachment deleted successfully." });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: "Failed to delete attachment.", error: error.message });
+  }
+};

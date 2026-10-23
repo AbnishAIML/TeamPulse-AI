@@ -66,6 +66,19 @@ export const getReportSummary = async (req: AuthenticatedRequest, res: Response)
   }
 };
 
+/**
+ * Sanitizes a value for CSV export to prevent spreadsheet formula injection (CWE-1236).
+ * Escapes quotes and prefixes formula-triggering characters (=, +, -, @, \t, \r) with a single quote.
+ */
+const sanitizeCsvCell = (val: any): string => {
+  if (val === null || val === undefined) return '""';
+  let str = String(val);
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = "'" + str;
+  }
+  return `"${str.replace(/"/g, '""')}"`;
+};
+
 export const exportReportCSV = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { projectId } = req.params;
@@ -81,11 +94,12 @@ export const exportReportCSV = async (req: AuthenticatedRequest, res: Response):
       const milestones = await Milestone.find({ projectId }).sort({ dueDate: 1 }).lean();
       let csv = "Title,Status,Due Date,Progress,Completion Criteria\n";
       milestones.forEach((m) => {
-        const criteria = `"${(m.completionCriteria || []).join("; ").replace(/"/g, '""')}"`;
-        csv += `"${m.title.replace(/"/g, '""')}",${m.status},${new Date(m.dueDate).toISOString().split("T")[0]},${m.progressPct}%,${criteria}\n`;
+        const criteria = (m.completionCriteria || []).join("; ");
+        const dueDate = m.dueDate ? new Date(m.dueDate).toISOString().split("T")[0] : "None";
+        csv += `${sanitizeCsvCell(m.title)},${sanitizeCsvCell(m.status)},${sanitizeCsvCell(dueDate)},${sanitizeCsvCell(`${m.progressPct}%`)},${sanitizeCsvCell(criteria)}\n`;
       });
 
-      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
       res.setHeader("Content-Disposition", `attachment; filename="${project.code}_milestones_report.csv"`);
       res.send(csv);
       return;
@@ -106,10 +120,10 @@ export const exportReportCSV = async (req: AuthenticatedRequest, res: Response):
       const isBlocked = t.blocker?.isBlocked ? "Yes" : "No";
       const reviewStatus = t.review?.status || "None";
 
-      csv += `"${t._id}","${t.title.replace(/"/g, '""')}","${assignee}","${milestone}",${t.priority},${t.status},${deadline},${t.estimatedHours},${t.remainingHours},${t.actualHours},${isBlocked},${reviewStatus}\n`;
+      csv += `${sanitizeCsvCell(t._id)},${sanitizeCsvCell(t.title)},${sanitizeCsvCell(assignee)},${sanitizeCsvCell(milestone)},${sanitizeCsvCell(t.priority)},${sanitizeCsvCell(t.status)},${sanitizeCsvCell(deadline)},${t.estimatedHours || 0},${t.remainingHours || 0},${t.actualHours || 0},${sanitizeCsvCell(isBlocked)},${sanitizeCsvCell(reviewStatus)}\n`;
     });
 
-    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${project.code}_tasks_report.csv"`);
     res.send(csv);
   } catch (error: any) {

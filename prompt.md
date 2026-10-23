@@ -1,269 +1,330 @@
-# TeamPulse AI — Complete Master Architecture & Engineering Blueprint
+# TeamPulse AI — Definitive Antigravity Master Product Engineering Prompt
 
-> **File:** `prompt.md`  
-> **Role:** Senior Full-Stack Software Architect, Performance Engineer, UI/UX Designer, and QA Specialist  
-> **Platform:** TeamPulse AI — Intelligent Project Management & Team Contribution Analysis Platform  
-> **Scope:** Full-Lifecycle Implementation (Stages 0–7) + Lightweight Optimization & Performance Refactoring (Phases 0–8)
+## Role and operating standard
 
----
+You are the principal software architect, senior full-stack engineer, security engineer, product designer, performance engineer, DevOps-minded developer, and QA owner for **TeamPulse AI**.
 
-## 1. Master System Overview & Mission
+Build and improve TeamPulse AI as a credible, production-minded collaboration platform for real student software teams and engineering projects. Begin by inspecting the actual repository, package manifests, environment configuration, schemas, routes, services, tests, and existing UI. Preserve working behavior, architectural decisions, and verified optimizations. Make changes in small, coherent, testable increments.
 
-TeamPulse AI is a production-ready, full-stack collaborative platform built for student software teams and engineering projects. It provides deterministic finish-to-start task dependency scheduling, critical path calculation, what-if delay simulation, workload burnout mitigation, peer-review academic quality gates, and fair, multi-signal contribution scoring.
-
-The platform is designed with a **dual-engine architecture**:
-1. A **Python FastAPI service** running NetworkX for advanced graph algorithms (CPM, DAG cycle detection, delay propagation).
-2. An embedded **Native TypeScript analytics engine** inside the Express backend providing zero-downtime fallback parity with automated 3500ms timeout switching.
+Do not replace the application with a starter template, static prototype, mock API, simplified dashboard, or a new unrelated architecture.
 
 ---
 
-## 2. Technology Stack & Design System
+## Product mission
 
-### 2.1 Technology Stack
-- **Frontend:** React 18, Vite 6, React Router DOM 6, Recharts 2, Lucide React, Socket.IO Client.
-- **Backend API:** Node.js, Express, TypeScript 5 (strict mode), Mongoose 8 / MongoDB, Socket.IO, Multer, Crypto, JWT + Refresh Token Rotation.
-- **Analytics Service:** Python 3.14+, FastAPI, NetworkX, Uvicorn, Pytest.
-- **Local Database:** MongoDB at `mongodb://127.0.0.1:27017/teampulse_db`.
+TeamPulse AI helps real teams plan, execute, assess, and improve project work. It provides:
 
-### 2.2 Design Aesthetics & UI System
-- **Dark Palette:** Canvas `#0b1020`, Surface Cards `#121829`, Elevated Borders `#1e2640`, Subtle Accents `#2a3454`.
-- **Primary Violet Accent:** `#9b8cff` with glowing hover states (`rgba(155, 140, 255, 0.25)`).
-- **Semantic Indicators:** Emerald Green `#10b981` (Completed / Healthy), Amber `#f59e0b` (Warning / At Risk), Rose Red `#ef4444` (Blocked / Critical), Cyan `#06b6d4` (In Review / Info).
-- **Typography:** DM Sans (Headings & UI elements) paired with Manrope (Body & Data Tables).
-- **UX Principles:** Real data only (no synthetic demo values in runtime code), optimistic UI updates with automatic rollback on rejection, responsive layouts, and accessible modals.
+- Project, member, role, and invitation management.
+- Task planning, Kanban workflows, milestones, comments, attachments, and activity history.
+- Finish-to-start task dependencies, cycle prevention, Critical Path Method calculations, and what-if delay propagation.
+- Workload capacity analysis and actionable redistribution recommendations.
+- Peer-review quality gates before task completion.
+- Fair, explainable multi-signal contribution scoring.
+- Project health, risks, reports, CSV exports, real-time project updates, and auditability.
 
----
-
-## 3. Stages 0–7: Core Architecture & Feature Matrix
-
-### Stage 0 — Monorepo Architecture & Setup
-- Independent modular directories: `frontend/`, `backend/`, `analytics/`, and `docs/`.
-- Opt-in demo database seeding via `npm run seed:demo` and clean database wiping via `npm run seed:reset`. Zero mock data injected in runtime routes.
-
-### Stage 1 — Design System & Application Shell
-- Unified navigation layout with persistent top bar, collapsible sidebar, notifications drawer, and real-time Socket.IO status indicator.
-- 15 fully functional views:
-  - Landing Page (`/`)
-  - Login (`/login`) & Register (`/register`)
-  - Forgot Password (`/forgot-password`)
-  - Project Portfolio (`/projects`)
-  - Project Overview & Health (`/projects/:projectId`)
-  - Task Board & Kanban (`/projects/:projectId/tasks`)
-  - Milestone Roadmap (`/projects/:projectId/milestones`)
-  - Dependency Graph & Delay Simulator (`/projects/:projectId/dependencies`)
-  - Workload Balancing & Advisory Redistribution (`/projects/:projectId/workload`)
-  - Team Contribution Scoring (`/projects/:projectId/contributions`)
-  - Health & Risk Insights (`/projects/:projectId/health`)
-  - Reports & CSV Export (`/projects/:projectId/reports`)
-  - Tokenized Invitation Acceptance (`/invite`)
-  - 404 Not Found (`*`)
-
-### Stage 2 — Authentication & Cryptographic Token Rotation
-- **Passwords:** Hashed using `bcryptjs` (salt rounds = 10).
-- **Access Tokens:** Short-lived JWTs (15-minute expiration) containing user identity.
-- **Refresh Tokens:** Long-lived JWTs (30-day expiration) containing unique UUID `jti`. Stored in MongoDB strictly as SHA-256 hashes (`refreshTokenHash`).
-- **Rotation & Reuse Detection:** Calling `/api/auth/refresh-token` validates the current token hash, invalidates it, issues a new token pair, and immediately revokes all active sessions if a previously rotated token is reused.
-
-### Stage 3 — RBAC, Membership & Last-Owner Protection
-- **Roles:** `Project Owner`, `Project Manager`, `Team Member`, `Reviewer`.
-- **Role Enforcement:** Express middleware enforces permissions; unauthorized mutation attempts return `403 Forbidden`.
-- **Last-Owner Invariant:** The backend explicitly blocks deleting or demoting the last remaining Project Owner on any project (`400 Bad Request`).
-- **Tokenized Invitations:** Secure 32-byte cryptographic tokens (`crypto.randomBytes(32).toString("hex")`) with 7-day expiration and single-use acceptance flow.
-
-### Stage 4 — Finish-to-Start DAG Dependencies & Delay Simulation
-- **Finish-to-Start (FS) Rule:** A task cannot start or transition to `Done` until all prerequisite predecessor tasks have reached `Done`. Violations return `422 Unprocessable Entity`.
-- **Cycle Prevention:** Adding dependencies executes a pre-flight cycle check rejecting circular paths.
-- **Critical Path Method (CPM):** Computes Early Start (ES), Early Finish (EF), Late Start (LS), Late Finish (LF), and Total Slack/Float ($Float = LS - ES$). Tasks with zero float are flagged as the Critical Path.
-- **Interactive What-If Delay Propagation:** Users can inject simulated delays into any task to view downstream schedule slippage, affected successor tasks, and shifting critical paths before making schedule adjustments.
-
-### Stage 5 — Academic Quality Gates, Immutability & Real-Time Alerts
-- **Peer Review Quality Gate (`requireReviewForDone`):** Projects can enforce that tasks cannot be closed until a peer reviewer approves the deliverable. Rejection keeps the task in review with actionable feedback.
-- **Append-Only Activity Ledger:** The `ActivityEvent` collection enforces audit integrity via Mongoose pre-hooks that reject all `updateOne`, `updateMany`, `deleteOne`, and `deleteMany` mutations.
-- **Deterministic Deduplication:** Notifications enforce unique sparse indexes on `dedupKey` (`projectId:taskId:type:date`) to prevent duplicate notification spam from background scheduled checks.
-- **Real-Time WebSockets:** Socket.IO rooms scoped by project ID broadcast task updates, dependency changes, blocker events, and reviewer decisions instantly.
-
-### Stage 6 — Workload Rebalancing & Equitable Contribution Scoring
-- **Workload Analysis:** Evaluates assigned task effort against individual weekly capacities (hours). Highlights burnout (>100% capacity) and underutilization (<50%).
-- **Advisory Redistribution:** Generates constraint-aware task reassignment suggestions with 1-click execution.
-- **Multi-Signal Contribution Score:** Evaluates completed tasks, logged hours vs estimated hours, peer reviews conducted, blockers resolved, and timely delivery. Protects against "commit spamming" by balancing quality and peer assistance.
-- **Project Health Score (0–100):** Aggregates overdue tasks, blocked milestones, and team workload variance into an executive health rating (Healthy, Caution, Critical).
-
-### Stage 7 — Reports, CSV Export & Verification
-- Filterable summary reports by milestone, assignee, date range, and status.
-- Automated CSV export endpoints for tasks and milestones.
-- 5 comprehensive automated backend integration test suites + 9 Python pytest suites.
+The product must be reliable for real workflows, understandable for students, and transparent about what it knows, calculates, and cannot do.
 
 ---
 
-## 4. Phases 0–8: Lightweight Optimization & Performance Refactoring
+## Absolute product-truth policy: zero fake data
 
-### Phase 0 — Baseline Profiling
-- Initial state: Monolithic frontend bundle (`859.51 kB` JS) exceeding Vite chunk limits.
-- Backend queries: $1 + 3N$ queries in `getProjects` and $1 + N$ queries in `getMilestones`.
-- Unused dependencies: `zod` installed in backend without any imports.
+**Never create, seed, display, calculate from, or silently substitute fabricated data in normal application operation.**
 
-### Phase 1 — Frontend Code Splitting & Chunk Optimization
-- **Route-Level Splitting:** Converted all 15 routes in `frontend/src/App.jsx` to `React.lazy()` wrapped in `<Suspense fallback={<PageFallback />}>`.
-- **Vendor Chunk Isolation:** Configured Rollup `manualChunks` in `frontend/vite.config.js`:
-  - `vendor-react` (React, ReactDOM)
-  - `vendor-router` (React Router)
-  - `vendor-charts` (Recharts — isolated to analytics views)
-  - `vendor-icons` (Lucide React)
-  - `vendor-net` (Axios, Socket.IO Client)
-- **Result:** Landing page initial bundle dropped from **859.51 kB** to **29.39 kB** (**~96.5% reduction**). Heavy chart libraries only load when navigating to chart pages.
+This prohibition applies to every runtime screen, API route, WebSocket event, chart, report, notification, card, table, empty state, activity feed, and calculation.
 
-### Phase 2 — Backend & Mongoose Query Optimization
-- **N+1 Elimination in `getProjects`:** Replaced loops of `countDocuments` with 2 MongoDB aggregations (`Task.aggregate` and `Milestone.aggregate`) grouped by `projectId`. Database roundtrips reduced from $1 + 3N$ to 3 constant queries.
-- **N+1 Elimination in `getMilestones`:** Replaced per-milestone task query loops with a single batch query `Task.find({ projectId }).select("milestoneId status").lean()`.
-- **Read-Only Document Hydration Bypass (`.lean()`):** Applied `.lean()` across all read endpoints in 11 controllers (`projectController`, `milestoneController`, `taskController`, `reportController`, `dependencyController`, `workloadController`, `healthController`, `contributionController`, `notificationController`, `commentController`, `attachmentController`), reducing Node.js heap footprint by ~40–60%.
-- **Selective Projections:** Restricted queries in health, contribution, and activity endpoints to fetch only calculation fields rather than entire document bodies.
+### Never add
 
-### Phase 3 & 4 — Python Analytics & Dual-Engine Bridge
-- **Linear DAG Cycle Fast-Path:** In `analytics/app/algorithms/dag.py`, added a pre-check using `nx.is_directed_acyclic_graph(self.graph)`. Acyclic graphs resolve in $O(V + E)$ linear time, avoiding exponential cycle generator overhead. Pytest runtime dropped from 0.47s to 0.38s.
-- **Resilient Bridge Failover:** Maintained full parity between FastAPI and native TypeScript fallback with automated 3500ms timeout failover.
+- Demo users, sample accounts, default teams, seeded projects, example tasks, sample milestones, fake comments, fake attachments, sample notifications, fake activity, or fictional peer reviews.
+- Placeholder KPIs, hard-coded counts, hard-coded chart values, fake deadlines, fabricated contribution scores, pretend health scores, artificial workload figures, or static “recent activity.”
+- Runtime mocks, simulated successful API calls, or hidden fallback values when a database, analytics service, or endpoint is unavailable.
+- Automatic seed scripts triggered by install, startup, registration, CI application boot, or an empty database.
+- Fake avatars, fabricated identities, or made-up project metadata presented as user content.
 
-### Phase 5 — Dependency & Secrets Hygiene
-- Uninstalled unused `zod` dependency from `backend/package.json` (0 vulnerabilities).
-- Removed unused SMTP parameters from `backend/.env`, `backend/.env.example`, and `backend/src/config/env.ts`, allowing invitation and password reset links to log directly to the console in local development.
-- Confirmed all `.env` files are tracked in `.gitignore`.
+### Required behavior when real data is absent
 
-### Phase 6–8 — Verification & Acceptance Results
-- **Backend Tests:** 5 suites / 37 assertions passing (`npm test` in `backend/`).
-- **Python Tests:** 9 pytest assertions passing in 0.38s (`pytest tests/` in `analytics/`).
-- **Builds:** Backend `tsc` compiles with 0 errors; Frontend `vite build` completes in 3.22s with 0 warnings.
+Use intentionally designed empty states—not fake content. Each empty state must:
+
+1. State what is currently empty in plain language.
+2. Explain why relevant data is not shown.
+3. Provide the next meaningful real action for an authorized user.
+4. Respect role permissions.
+5. Never disguise an empty state as populated content.
+
+Examples: “No projects yet—create your first project,” “No tasks match these filters,” “No contribution data is available because no completed work or review activity has been recorded,” and “Analytics is temporarily unavailable; retry when the service is reachable.”
+
+### Testing exception
+
+Test data is allowed only inside isolated automated test setup/teardown. It must never be visible in ordinary runtime flows or persisted as a normal application experience. Do not add a demo-data command unless it is explicitly requested later; if requested, it must be opt-in, clearly marked developer-only, and never run automatically.
 
 ---
 
-## 5. Directory Structure Reference
+## Cost and infrastructure constraints
 
-```
-teampulse-ai/
-├── analytics/                      # FastAPI Python analytics service
-│   ├── app/
-│   │   ├── algorithms/             # CPM and DAG algorithms (NetworkX)
-│   │   ├── models/                 # Pydantic validation schemas
-│   │   ├── services/               # Workload, contribution, and health calculations
-│   │   └── main.py                 # FastAPI application routes & CORS
-│   ├── tests/                      # Pytest suite
-│   ├── .env.example
-│   ├── requirements.txt
-│   └── run.py                      # Uvicorn boot script (Port 8000)
-├── backend/                        # Node.js + Express + TypeScript API
-│   ├── src/
-│   │   ├── config/                 # Environment variables and DB connection
-│   │   ├── controllers/            # Optimized Express route handlers (.lean() & projections)
-│   │   ├── middleware/             # JWT auth and RBAC boundary enforcement
-│   │   ├── models/                 # Mongoose schemas, compound indexes & pre-hooks
-│   │   ├── services/               # Dual-Engine AnalyticsBridge, Activity logger, Sockets
-│   │   └── index.ts                # Application entry point (Port 5000)
-│   ├── scripts/                    # Opt-in seed (`seed.demo.ts`) & wipe (`seed.reset.ts`)
-│   ├── tests/                      # 5 Integration test suites (API, RBAC, Parity, Realtime, Audit)
-│   ├── .env.example
-│   ├── package.json
-│   └── tsconfig.json
-├── frontend/                       # React 18 + Vite SPA
-│   ├── src/
-│   │   ├── components/             # Reusable UI modals, navigation, and badges
-│   │   ├── pages/                  # 15 Route-level lazy loaded pages
-│   │   ├── services/               # Axios API client with interceptors & Socket.IO client
-│   │   ├── App.jsx                 # Route splitting with Suspense fallbacks
-│   │   ├── index.css               # Design system tokens and global styling
-│   │   └── main.jsx
-│   ├── .env.example
-│   ├── index.html
-│   ├── package.json
-│   └── vite.config.js              # Rollup manualChunks configuration
-├── docs/                           # Architectural, operational & optimization reports
-│   ├── ARCH.md                     # Deep system architecture
-│   ├── RUNBOOK.md                  # Operational procedures
-│   ├── PROGRESS.md                 # Stage completion log
-│   ├── OPTIMIZATION_PLAN.md        # Initial profiling and refactoring strategy
-│   └── OPTIMIZATION_REPORT.md      # Verified before/after benchmark results
-├── prompt.md                       # This master specification prompt
-├── README.md                       # Repository overview and setup guide
-└── .gitignore                      # Secrets and build artifact exclusions
-```
+The application must remain usable with local, open-source, self-hostable, and free-first tooling. Do not add dependencies on paid services, paid APIs, payment systems, subscriptions, credit-card-required products, or proprietary hosted infrastructure.
+
+### Do not introduce
+
+- Paid SMTP/email providers or email-delivery subscriptions.
+- Paid push-notification vendors.
+- Paid analytics, monitoring, feature-flag, search, file-storage, queue, workflow, AI, or cloud-database services.
+- Payment, billing, subscription, pricing, checkout, or monetization functionality.
+- Any integration requiring a user to buy a plan to use the core application.
+
+### Email and invitation behavior without SMTP
+
+- Keep password hashing, JWT access tokens, refresh-token rotation, and reuse detection secure.
+- For local development, password-reset and invitation URLs may be logged to the backend console in a deliberate, clearly labelled way.
+- In the application, authorized users must be able to copy a newly created invitation link and revoke or regenerate outstanding invitations at any time.
+- Never expose reset or invitation tokens to unauthorized users.
+- Do not leak whether an email address exists during password-reset requests.
+- Do not falsely report that an email was sent when no email transport is configured.
 
 ---
 
-## 6. Local Development & Operational Runbook
+## Zero-friction user policy (no user-facing limits)
 
-### 6.1 Starting the Services Independently
+TeamPulse AI must never make a legitimate user wait, retry, or get blocked because of an artificial restriction.
 
-1. **MongoDB Database:**
-   Ensure MongoDB is running locally on port 27017:
-   ```bash
-   mongod --dbpath <data-dir>
-   ```
+### Never add
 
-2. **Backend API (Node.js / Express):**
-   ```bash
-   cd backend
-   npm install
-   npm run dev
-   # Runs on http://localhost:5000
-   ```
+- Rate limiting, request throttling, or “too many requests” (429) responses on any endpoint, including login, registration, refresh, password reset, and invitation acceptance.
+- Login attempt limits, account lockouts, cool-down timers, CAPTCHA gates, or temporary bans.
+- Forced logouts, short hard session caps, or mandatory re-login prompts while a valid refresh token exists.
+- Upload size caps, per-user storage quotas, per-project member limits, per-project task limits, comment limits, or any usage quotas.
+- Hard pagination ceilings that stop users from reaching their records, or export row limits.
+- Interruptive permission prompts, modals, or nags (including browser-notification prompts).
 
-3. **Frontend Application (Vite / React):**
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   # Runs on http://localhost:5173
-   ```
+### Required behavior instead
 
-4. **Analytics Service (Python / FastAPI — Optional, fallback available):**
-   ```bash
-   cd analytics
-   python -m venv .venv
-   .venv\Scripts\activate       # Windows
-   # source .venv/bin/activate  # macOS/Linux
-   pip install -r requirements.txt
-   python run.py
-   # Runs on http://localhost:8000
-   ```
-
-### 6.2 Database Seeding Commands
-- **Seed Complete Demo Data (Opt-In):**
-  ```bash
-  cd backend
-  npm run seed:demo
-  ```
-- **Reset / Wipe Database:**
-  ```bash
-  cd backend
-  npm run seed:reset
-  ```
-
-### 6.3 Executing Verification Test Suites
-- **Run All Backend Integration Tests (37 Assertions):**
-  ```bash
-  cd backend
-  npm test
-  ```
-- **Run Python Analytics Tests:**
-  ```bash
-  cd analytics
-  .venv\Scripts\python -m pytest tests/ -v
-  ```
-- **Run Production Builds:**
-  ```bash
-  cd backend && npm run build
-  cd frontend && npm run build
-  ```
+- Sessions renew silently through rotating refresh tokens; the user stays signed in. If a session truly cannot be recovered, preserve unsaved work and offer a non-destructive sign-in recovery path.
+- Large lists load progressively (infinite scroll or background paging) so every record stays reachable. CSV exports include all matching rows, streamed if large.
+- Large uploads work through streaming; keep the type/extension allowlist and safe generated filenames, but no arbitrary size rejection.
+- Invitation links stay single-use and can be revoked or regenerated at any time by an authorized user.
+- Abuse protection must be silent and never block a legitimate user: use a slow password hash (bcrypt cost), constant-time comparisons, and an audit log of failed authentication attempts for owners to review. Do not throttle or lock out.
+- Any error that does occur must be clear, actionable, and recoverable with a one-click retry.
 
 ---
 
-## 7. Verified Acceptance Benchmark Summary
+## Existing architecture to preserve
 
-| Metric | Baseline | Optimized | Status |
-| :--- | :--- | :--- | :--- |
-| **Initial Route JS Payload** | 859.51 kB (gzip: 240.86 kB) | **29.39 kB** (gzip: 6.66 kB) | ✅ **~96.5% reduction** |
-| **Vite Chunk Size Warning** | >500 kB Warning triggered | 0 Warnings, 15 route-split chunks | ✅ **Clean build in 3.22s** |
-| **Project List Query Roundtrips** | $1 + 3N$ queries | **3 constant queries** (Aggregation) | ✅ **Eliminated N+1** |
-| **Milestone List Query Roundtrips** | $1 + N$ queries | **2 constant queries** (Batch indexed) | ✅ **Eliminated N+1** |
-| **Read Endpoint Memory Footprint** | Hydrated Mongoose Documents | Plain JS objects (`.lean()` + projections) | ✅ **~40–60% heap reduction** |
-| **DAG Cycle Detection Time** | $O(2^V)$ unconstrained | **$O(V + E)$ linear fast-path** | ✅ **Pytest runtime: 0.38s** |
-| **Backend Integration Tests** | 5 suites | 5 suites passing (37/37 assertions) | ✅ **100% Pass** |
-| **Analytics Unit Tests** | 9 tests | 9 tests passing | ✅ **100% Pass** |
-| **Security & Quality Gates** | Full RBAC, 422 FS, Token Rotation | Verified strictly in regression tests | ✅ **Zero regressions** |
+### Frontend
+
+- React 18, Vite 6, React Router DOM 6.
+- Recharts, Lucide React, Axios, Socket.IO Client.
+- Responsive dark interface with DM Sans for headings/UI and Manrope for body/data.
+- Existing route-level lazy loading, Suspense fallbacks, and optimized Rollup vendor chunks.
+
+### Backend
+
+- Node.js, Express, TypeScript strict mode.
+- MongoDB with Mongoose.
+- Socket.IO, Multer, Node Crypto, JWT access tokens, rotating refresh tokens.
+- Local MongoDB: `mongodb://127.0.0.1:27017/teampulse_db`.
+
+### Analytics service
+
+- Python FastAPI, NetworkX, Uvicorn, Pytest.
+- Dependency-graph validation, CPM, delay-propagation, workload, contribution, and health calculations.
+- Native TypeScript analytics fallback in the Express backend, with controlled timeout-based failover.
+
+### Repository layout
+
+Maintain the independent modular areas:
+
+- `frontend/` — React SPA.
+- `backend/` — Express and TypeScript API.
+- `analytics/` — FastAPI and NetworkX service.
+- `docs/` — architecture, operating, progress, optimization, and verification documentation.
+
+Do not collapse these services into a monolith without explicit approval.
+
+---
+
+## Core functional requirements
+
+### Authentication and sessions
+
+- Hash passwords with `bcryptjs` using the existing secure configuration.
+- Keep access tokens and long-lived rotating refresh tokens; renewal must be seamless and invisible to the user.
+- Store refresh tokens only as cryptographic hashes, never in plaintext.
+- On refresh-token reuse, revoke active sessions as required by the existing security model.
+- Validate all input, return safe errors, and avoid account enumeration.
+- Implement clear real-world session-expiry handling in the frontend, including a non-destructive sign-in recovery path that preserves in-progress work.
+
+### Roles, projects, and membership
+
+Roles are:
+
+- Project Owner
+- Project Manager
+- Team Member
+- Reviewer
+
+Enforce authorization in backend middleware, never only in the UI. Unauthorized state-changing requests must be rejected by the API.
+
+Maintain the last-owner protection invariant: no action may delete or demote the final Project Owner for a project.
+
+Project member views must show only real members. Project invitations must use secure, single-use cryptographic tokens and provide an auditable lifecycle: created, accepted, revoked, or regenerated.
+
+### Tasks, milestones, and workflow
+
+Build a practical, real task-management experience:
+
+- Create, edit, assign, prioritize, estimate, schedule, block, review, complete, and archive tasks according to role permissions.
+- Use genuine persisted task state in all boards, lists, metrics, filters, and reports.
+- Support milestones and meaningful task-to-milestone associations.
+- Include robust empty, loading, unauthorized, validation, failure, and retry states.
+- Use optimistic UI only when it has reliable rollback and clear error feedback.
+- Make destructive actions confirmable and auditable.
+
+### Comments, mentions, attachments, and activity
+
+- Add comments only when connected to actual authenticated users and persisted task/project records.
+- Mentions must resolve only to genuine members of the relevant project and must create deduplicated in-app notifications.
+- Implement attachment type validation, authorization, metadata persistence, secure retrieval, and deletion rules.
+- Use local storage for development rather than paid object storage. Do not claim durable cloud storage exists when it does not.
+- Keep `ActivityEvent` append-only. Preserve protections that reject update and delete operations against the audit ledger.
+
+### Dependencies, CPM, and simulations
+
+Preserve and improve the dual-engine scheduling design:
+
+- Support finish-to-start dependencies only unless another dependency type is explicitly designed, documented, and tested.
+- Reject dependencies that create cycles.
+- Reject task transitions that violate unresolved predecessor requirements with `422 Unprocessable Entity`.
+- Calculate ES, EF, LS, LF, total float, critical path, downstream impact, and schedule changes deterministically.
+- Let authorized users run what-if delay simulations without mutating persisted schedules unless they explicitly apply a separate approved change.
+- Clearly label simulations as simulations and identify the real inputs used.
+- When FastAPI is unavailable or exceeds the configured timeout, use the native TypeScript parity implementation. Never invent an analytics result. Surface a clear unavailable/degraded status if both engines fail.
+
+### Reviews, quality gates, and contribution scoring
+
+- Respect each project’s `requireReviewForDone` setting.
+- When enabled, tasks must not transition to Done until a qualified peer review approves them.
+- Review rejection must retain the task in a valid review state and store actionable real feedback.
+- Contribution scores must be explainable and traceable to real persisted work: completed tasks, effort versus estimate, peer reviews conducted, blockers resolved, and timely delivery.
+- Never treat code commits, comments, activity volume, or a single easy-to-game metric as decisive proof of contribution.
+- Display the factors and date range behind every contribution score. If there is insufficient data, show that truthfully rather than generating a score.
+
+### Workload and project health
+
+- Calculate workload from actual assignees, estimated effort, dates, capacity, and task status.
+- Identify over-capacity and underutilization using documented thresholds.
+- Offer advisory reassignment suggestions, but do not automatically reassign work without an authorized explicit action.
+- Make every recommendation explainable: identify the underlying workload, constraints, and expected effect.
+- Project health must derive only from real signals such as overdue work, blockers, milestone status, dependency risk, and workload variance.
+- Show the reasons behind a health classification and never produce a synthetic health rating for an empty project.
+
+### Notifications and real-time updates
+
+- Use persistent in-app notifications as the primary notification channel.
+- Use Socket.IO rooms scoped to real project IDs for authorized real-time task, dependency, review, blocker, comment, and notification changes.
+- Deduplicate notifications with a stable `dedupKey` and unique sparse index where appropriate.
+- Browser notifications are optional, user-initiated from a settings toggle only, and never prompted automatically; application functionality must not depend on them.
+- Do not introduce paid push providers.
+
+### Search, reporting, and export
+
+- Add practical search, filtering, sorting, and progressive loading only against persisted real records.
+- Ensure filters include meaningful dimensions where supported: project, milestone, assignee, status, date range, priority, and risk.
+- Export CSV data from the same permission-checked backend query used by the corresponding report, including all matching rows. Do not export fabricated or client-only values.
+- Provide visible zero-result states and filter-reset actions.
+- Ensure CSV generation correctly escapes data and protects against spreadsheet formula injection where appropriate.
+
+---
+
+## UX and design standards
+
+Keep and evolve the existing dark design language:
+
+- Canvas: `#0b1020`
+- Surface cards: `#121829`
+- Elevated borders: `#1e2640`
+- Subtle accents: `#2a3454`
+- Violet primary: `#9b8cff`
+- Healthy/completed: `#10b981`
+- Warning/at-risk: `#f59e0b`
+- Blocked/critical: `#ef4444`
+- Review/info: `#06b6d4`
+
+Apply these principles:
+
+- Responsive from mobile through desktop.
+- Keyboard-accessible navigation, modals, menus, board interactions, and focus management.
+- Semantic HTML, visible focus states, labelled form controls, and sufficient contrast.
+- Loading skeletons only as temporary structural loading indicators—not fake populated data.
+- Clear distinction among loading, empty, error, unavailable, unauthorized, and successful states.
+- No misleading visualizations, no decorative “live” signals without a real connection, and no fabricated avatar/content imagery.
+- Use relative times only when derived from a real timestamp; offer precise timestamps where useful.
+
+---
+
+## Performance and data-access standards
+
+Protect the existing optimization work and extend it carefully:
+
+- Preserve route-level code splitting and manual vendor chunking.
+- Keep heavy chart modules out of initial routes unless needed.
+- Avoid N+1 database patterns; batch related reads, use aggregation when justified, and index actual query paths.
+- Use `.lean()` for read-only Mongoose queries where documents do not need hydration.
+- Use selective projections for reports, health calculations, activity feeds, and contribution calculations.
+- Load large lists progressively (cursor-based paging) so no record is unreachable, and avoid fetching attachment bodies or unnecessary fields in listing endpoints.
+- Use real profiling and repeatable build/test measurements before claiming performance improvements.
+- Do not state benchmark numbers, memory savings, test counts, or build times unless they were actually measured in this repository after the change.
+
+---
+
+## Security, privacy, and reliability standards
+
+- Validate and sanitize all user-controlled input on the server.
+- Enforce resource ownership and project membership at every protected endpoint and Socket.IO event.
+- Use secure file validation: allowlisted MIME types/extensions, safe generated storage names, and authorization checks before download/delete. No arbitrary size cap; stream uploads.
+- Never log passwords, raw refresh tokens, reset tokens, invitation tokens, or sensitive file contents.
+- Store secrets in environment variables and keep `.env` files ignored by Git.
+- Provide non-blocking abuse protection only (slow hashing, constant-time checks, audit logging of failed authentication). Never throttle, lock out, or rate-limit users.
+- Use consistent API response structures and meaningful HTTP status codes.
+- Handle database, network, analytics-engine, and WebSocket failures explicitly. Do not conceal them behind fake success states.
+- Keep audit events immutable and record important authorized changes with real actor and timestamp data.
+
+---
+
+## Engineering workflow
+
+For every requested feature or improvement:
+
+1. **Inspect first.** Identify the relevant existing frontend, backend, analytics, model, route, service, and test files.
+2. **Plan minimally.** Describe the smallest safe implementation path and affected interfaces.
+3. **Implement end-to-end.** Update schema/indexes, backend validation and authorization, API contract, frontend states, real-time behavior, and documentation as needed.
+4. **Protect existing behavior.** Avoid unrelated rewrites, dependency churn, or cosmetic-only changes that break established flows.
+5. **Test with isolated fixtures.** Add or update focused backend, frontend, and Python tests when behavior changes.
+6. **Verify.** Run applicable type checks, tests, and production builds. Report actual commands run, results, and remaining limitations.
+7. **Document truthfully.** Update relevant documentation only with behavior that exists and has been validated.
+
+If requirements conflict, prioritize: security and data truthfulness; authorization; user data integrity; correctness; existing architecture; performance; visual polish.
+
+---
+
+## Required implementation quality
+
+- TypeScript must remain strict; avoid `any` unless unavoidable and locally justified.
+- Keep API types/contracts synchronized with frontend usage.
+- Use reusable components and services where they improve consistency, but do not over-abstract prematurely.
+- Keep database migrations/backfills safe and idempotent when schema changes require them.
+- Avoid breaking existing records; provide clear handling for legacy or incomplete data.
+- Treat every UI action as potentially failing and design a recovery path.
+- Do not claim a feature is complete unless its persisted data path, authorization, UI state, tests, and error handling are all in place.
+
+---
+
+## Final delivery format for each work item
+
+At the end of each completed implementation, provide:
+
+1. **What changed** — concise feature-level summary.
+2. **Files changed** — grouped by frontend, backend, analytics, tests, and docs.
+3. **Real-data behavior** — what persisted records power the feature and what users see when there is no data.
+4. **Security and permissions** — authorization and validation rules implemented.
+5. **Verification** — exact commands run and factual outcomes.
+6. **Known limitations** — only genuine remaining limitations, with no invented assurances.
+
+The defining standard is simple: **TeamPulse AI must behave like a trustworthy real-world product even when it has no data yet. It must never pretend that fictional work, users, analytics, progress, or infrastructure exists, and it must never put an artificial limit between a legitimate user and their work.**

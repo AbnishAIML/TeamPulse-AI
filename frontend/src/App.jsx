@@ -148,6 +148,20 @@ function DashboardShell() {
   );
 }
 
+function ProtectedDashboard() {
+  const { user } = useAuth();
+  const location = useLocation();
+
+  if (!user) {
+    if (location.pathname && location.pathname !== "/login") {
+      sessionStorage.setItem("tp_redirect_url", location.pathname + location.search);
+    }
+    return <Navigate to="/login" replace />;
+  }
+
+  return <DashboardShell />;
+}
+
 export default function App() {
   const { user, loading: authLoading } = useAuth();
 
@@ -196,7 +210,7 @@ export default function App() {
         {/* Protected Dashboard Area */}
         <Route
           path="/dashboard/*"
-          element={user ? <DashboardShell /> : <Navigate to="/login" replace />}
+          element={<ProtectedDashboard />}
         />
 
         {/* 404 Catch-All */}

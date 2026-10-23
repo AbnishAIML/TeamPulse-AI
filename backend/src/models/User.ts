@@ -12,6 +12,8 @@ export interface IUser extends Document {
   title: string;
   skills: string[];
   refreshTokenHash?: string;
+  resetPasswordTokenHash?: string;
+  resetPasswordExpires?: Date;
   comparePassword(candidate: string): Promise<boolean>;
   createdAt: Date;
   updatedAt: Date;
@@ -29,6 +31,8 @@ const UserSchema = new Schema<IUser>(
     title: { type: String, default: "Software Engineer" },
     skills: { type: [String], default: [] },
     refreshTokenHash: { type: String, select: false },
+    resetPasswordTokenHash: { type: String, select: false },
+    resetPasswordExpires: { type: Date, select: false },
   },
   { timestamps: true }
 );

@@ -11,6 +11,7 @@ import {
   createInvitation,
   getInvitations,
   revokeInvitation,
+  regenerateInvitation,
   acceptInvitation,
 } from "../controllers/projectController.js";
 import { authenticate } from "../middleware/auth.js";
@@ -36,6 +37,7 @@ router.delete("/:projectId/members/:memberId", requireProjectRole(["Project Owne
 router.post("/:projectId/invitations", requireProjectRole(["Project Owner", "Project Manager"]), createInvitation);
 router.get("/:projectId/invitations", requireProjectRole(["Project Owner", "Project Manager"]), getInvitations);
 router.delete("/:projectId/invitations/:invitationId", requireProjectRole(["Project Owner", "Project Manager"]), revokeInvitation);
+router.post("/:projectId/invitations/:invitationId/regenerate", requireProjectRole(["Project Owner", "Project Manager"]), regenerateInvitation);
 
 // Accept invitation
 router.post("/invitations/accept", acceptInvitation);

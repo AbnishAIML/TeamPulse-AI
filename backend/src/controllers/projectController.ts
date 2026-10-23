@@ -457,6 +457,43 @@ export const revokeInvitation = async (req: AuthenticatedRequest, res: Response)
   }
 };
 
+export const regenerateInvitation = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { projectId, invitationId } = req.params;
+
+    const project = await Project.findById(projectId);
+    if (!project) {
+      res.status(404).json({ success: false, message: "Project not found." });
+      return;
+    }
+
+    const invitation = await Invitation.findOne({ _id: invitationId, projectId });
+    if (!invitation) {
+      res.status(404).json({ success: false, message: "Invitation not found." });
+      return;
+    }
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    invitation.token = token;
+    invitation.expiresAt = expiresAt;
+    invitation.status = "pending";
+    await invitation.save();
+
+    const inviteLink = `${req.headers.origin || "http://localhost:5173"}/invite?token=${token}`;
+
+    res.json({
+      success: true,
+      invitation,
+      inviteLink,
+      message: `Invitation regenerated for ${invitation.email}. Share the link to grant access.`,
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: "Failed to regenerate invitation.", error: error.message });
+  }
+};
+
 export const acceptInvitation = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { token } = req.body;

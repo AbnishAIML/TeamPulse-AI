@@ -19,9 +19,21 @@ const storage = multer.diskStorage({
   },
 });
 
+const dangerousExtensions = [".exe", ".bat", ".cmd", ".sh", ".php", ".vbs", ".msi", ".com", ".scr"];
+
+const fileFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (dangerousExtensions.includes(ext)) {
+    return cb(new Error("Executable or script files are prohibited for security."));
+  }
+  cb(null, true);
+};
+
 export const upload = multer({
   storage,
+  fileFilter,
   limits: {
-    fileSize: 15 * 1024 * 1024, // 15 MB
+    fileSize: 100 * 1024 * 1024, // Generous 100MB per file to avoid arbitrary user blocking
   },
 });
+

@@ -12,6 +12,7 @@ import {
   AlertCircle,
   FileText,
   UserCheck,
+  Trash2,
 } from "lucide-react";
 import { tasksAPI, commentsAPI, reviewsAPI, attachmentsAPI } from "../services/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -182,6 +183,19 @@ export default function TaskDetailModal({ taskId, isOpen, onClose, onTaskUpdated
       }
     } catch (err) {
       setError("Failed to upload file.");
+    }
+  };
+
+  const handleDeleteAttachment = async (attachmentId, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!window.confirm("Are you sure you want to delete this attachment?")) return;
+    try {
+      await attachmentsAPI.deleteAttachment(attachmentId);
+      setAttachments((prev) => prev.filter((a) => a._id !== attachmentId));
+      showToast("Attachment deleted.");
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to delete attachment.");
     }
   };
 
@@ -609,25 +623,49 @@ export default function TaskDetailModal({ taskId, isOpen, onClose, onTaskUpdated
               ) : (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                   {attachments.map((att) => (
-                    <a
+                    <div
                       key={att._id}
-                      href={attachmentsAPI.getDownloadUrl(att._id)}
-                      download
                       style={{
                         display: "flex",
                         alignItems: "center",
                         gap: "6px",
-                        padding: "6px 9px",
+                        padding: "5px 8px",
                         background: "#141c30",
                         border: "1px solid #28334d",
                         borderRadius: "6px",
-                        color: "#c6beff",
-                        textDecoration: "none",
                         fontSize: "10px",
                       }}
                     >
-                      <FileText size={13} /> {att.originalName}
-                    </a>
+                      <a
+                        href={attachmentsAPI.getDownloadUrl(att._id)}
+                        download
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          color: "#c6beff",
+                          textDecoration: "none",
+                        }}
+                      >
+                        <FileText size={13} /> {att.originalName}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteAttachment(att._id, e)}
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          color: "#ff8c9c",
+                          cursor: "pointer",
+                          padding: "2px",
+                          display: "flex",
+                          alignItems: "center",
+                        }}
+                        title="Delete attachment"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}

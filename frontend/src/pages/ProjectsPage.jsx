@@ -245,6 +245,25 @@ export default function ProjectsPage({ showCreateModal, setShowCreateModal }) {
     }
   };
 
+  // Regenerate Invitation Link
+  const handleRegenerateInvitation = async (invitationId) => {
+    if (!manageProject) return;
+    try {
+      const res = await projectsAPI.regenerateInvitation(manageProject._id, invitationId);
+      if (res.data.success) {
+        if (res.data.inviteLink) {
+          navigator.clipboard.writeText(res.data.inviteLink);
+          showToast("Invitation regenerated & link copied to clipboard!");
+        } else {
+          showToast("Invitation regenerated!");
+        }
+        refreshManageData();
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || "Failed to regenerate invitation.");
+    }
+  };
+
   // Update Member Role
   const handleRoleChange = async (memberUserId, newRole) => {
     if (!manageProject) return;
@@ -1049,14 +1068,25 @@ export default function ProjectsPage({ showCreateModal, setShowCreateModal }) {
                               Expires: {new Date(inv.expiresAt).toLocaleDateString()}
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            className="button-secondary"
-                            onClick={() => handleRevokeInvitation(inv._id)}
-                            style={{ height: "26px", fontSize: "10px", color: "#ff8c9c" }}
-                          >
-                            Revoke
-                          </button>
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            <button
+                              type="button"
+                              className="button-secondary"
+                              onClick={() => handleRegenerateInvitation(inv._id)}
+                              style={{ height: "26px", fontSize: "10px", color: "#9b8cff" }}
+                              title="Regenerate single-use token and copy new invite link"
+                            >
+                              Regenerate & Copy
+                            </button>
+                            <button
+                              type="button"
+                              className="button-secondary"
+                              onClick={() => handleRevokeInvitation(inv._id)}
+                              style={{ height: "26px", fontSize: "10px", color: "#ff8c9c" }}
+                            >
+                              Revoke
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>

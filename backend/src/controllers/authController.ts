@@ -96,12 +96,14 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     const user = await User.findOne({ email: email.toLowerCase().trim() }).select("+password");
     if (!user) {
+      console.warn(`[Security Audit] Failed login attempt: user '${email.toLowerCase().trim()}' not found from IP '${req.ip || "unknown"}' at ${new Date().toISOString()}`);
       res.status(401).json({ success: false, message: "Invalid email or password." });
       return;
     }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
+      console.warn(`[Security Audit] Failed login attempt: incorrect password for '${email.toLowerCase().trim()}' from IP '${req.ip || "unknown"}' at ${new Date().toISOString()}`);
       res.status(401).json({ success: false, message: "Invalid email or password." });
       return;
     }
@@ -270,3 +272,86 @@ export const updatePassword = async (req: AuthenticatedRequest, res: Response): 
     res.status(500).json({ success: false, message: "Failed to update password.", error: error.message });
   }
 };
+
+export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      res.status(400).json({ success: false, message: "Email is required." });
+      return;
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: cleanEmail }).select("+resetPasswordTokenHash +resetPasswordExpires");
+
+    if (user) {
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      const tokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
+      user.resetPasswordTokenHash = tokenHash;
+      user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour expiry
+      await user.save();
+
+      const origin = req.headers.origin || ENV.CLIENT_URL || "http://localhost:5173";
+      const resetUrl = `${origin}/forgot-password?token=${resetToken}`;
+      console.log(`[Password Reset] Reset token generated for '${cleanEmail}': ${resetUrl}`);
+    } else {
+      console.warn(`[Security Audit] Password reset requested for non-existent email '${cleanEmail}' from IP '${req.ip || "unknown"}'`);
+    }
+
+    // Always return constant message to prevent email enumeration attacks
+    res.json({
+      success: true,
+      message: "If an account with that email exists, password reset instructions have been generated.",
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: "Failed to process password reset request.", error: error.message });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      res.status(400).json({ success: false, message: "Reset token and new password are required." });
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      res.status(400).json({ success: false, message: "New password must be at least 8 characters long." });
+      return;
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const user = await User.findOne({
+      resetPasswordTokenHash: tokenHash,
+      resetPasswordExpires: { $gt: new Date() },
+    }).select("+resetPasswordTokenHash +resetPasswordExpires +password");
+
+    if (!user) {
+      console.warn(`[Security Audit] Invalid or expired password reset attempt with token from IP '${req.ip || "unknown"}'`);
+      res.status(400).json({
+        success: false,
+        message: "Invalid or expired password reset token. Please request a new one.",
+      });
+      return;
+    }
+
+    user.password = newPassword;
+    user.resetPasswordTokenHash = undefined;
+    user.resetPasswordExpires = undefined;
+    // Invalidate existing sessions on password change
+    user.refreshTokenHash = undefined;
+    await user.save();
+
+    console.log(`[Security Audit] Password successfully reset for user '${user.email}' from IP '${req.ip || "unknown"}'`);
+
+    res.json({
+      success: true,
+      message: "Password reset successfully. You can now log in with your new password.",
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: "Failed to reset password.", error: error.message });
+  }
+};
+

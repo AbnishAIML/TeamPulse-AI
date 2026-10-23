@@ -18,7 +18,9 @@ export default function LoginPage({ onSwitchToRegister }) {
     setLoading(true);
     try {
       await login(email, password);
-      if (navigate) navigate("/dashboard");
+      const returnUrl = sessionStorage.getItem("tp_redirect_url") || "/dashboard";
+      sessionStorage.removeItem("tp_redirect_url");
+      if (navigate) navigate(returnUrl);
     } catch (err) {
       setError(err.message || "Invalid email or password.");
     } finally {
