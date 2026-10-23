@@ -135,7 +135,7 @@ export default function LandingPage() {
           </a>
         </div>
 
-        {/* Product Preview UI Demo */}
+        {/* Interactive Product Preview */}
         <div
           style={{
             background: "linear-gradient(180deg, #12182b, #0c1020)",

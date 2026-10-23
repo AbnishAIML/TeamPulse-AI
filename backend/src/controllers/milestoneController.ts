@@ -77,8 +77,11 @@ export const createMilestone = async (req: AuthenticatedRequest, res: Response):
       description: description || "",
       dueDate: new Date(dueDate),
       completionCriteria: Array.isArray(completionCriteria) ? completionCriteria : [],
-      status: "Planning",
-      progressPct: 0,
+      status: req.body.status || "Planning",
+      progressPct: req.body.progressPct || 0,
+      createdAt: req.body.createdAt ? new Date(req.body.createdAt) : undefined,
+      completedAt: req.body.completedAt ? new Date(req.body.completedAt) : undefined,
+      batchMarker: req.body.batchMarker || undefined,
     });
 
     emitToProject(projectId, "milestone:created", milestone);

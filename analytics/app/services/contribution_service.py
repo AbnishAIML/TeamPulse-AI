@@ -74,6 +74,30 @@ def analyze_team_contributions(request: ContributionAnalysisRequest) -> Contribu
         if not strengths:
             strengths.append("Steady active contributor to ongoing sprint")
 
+        # Determine if member has sufficient recorded delivery data
+        # If member has 0 completed deliverables, <= 2 tasks assigned, and no reviews or blockers resolved
+        is_insufficient = (
+            mem.tasks_completed == 0 and
+            mem.tasks_assigned <= 2 and
+            mem.reviews_conducted == 0 and
+            mem.blockers_resolved == 0
+        )
+
+        has_sufficient = not is_insufficient
+        insufficient_reason = (
+            "Insufficient completed work or peer review activity has been recorded yet to compute a reliable contribution index."
+            if is_insufficient else None
+        )
+
+        if is_insufficient:
+            composite = 0.0
+            strengths = ["Recently onboarded — initial deliverable scoped"]
+            completion_score = 0.0
+            effort_accuracy = 0.0
+            review_score = 0.0
+            problem_score = 0.0
+            timeliness = 0.0
+
         indicator = ContributionIndicator(
             user_id=mem.user_id,
             name=mem.name,
@@ -84,6 +108,8 @@ def analyze_team_contributions(request: ContributionAnalysisRequest) -> Contribu
             timeliness_score=round(timeliness, 1),
             composite_contribution_index=composite,
             key_strengths=strengths,
+            has_sufficient_data=has_sufficient,
+            insufficient_data_reason=insufficient_reason,
             transparency_notes=(
                 "Multi-dimensional indicator reflecting deliverable completions, peer review participation, "
                 "estimation precision, and blocker resolution. This metric is intended to assist equitable work "

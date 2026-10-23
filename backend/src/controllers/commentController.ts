@@ -43,6 +43,8 @@ export const addComment = async (req: AuthenticatedRequest, res: Response): Prom
       projectId: task.projectId,
       authorId: req.user!._id,
       text: text.trim(),
+      createdAt: req.body.createdAt ? new Date(req.body.createdAt) : undefined,
+      batchMarker: req.body.batchMarker || (task as any).batchMarker,
     });
 
     const populated = await Comment.findById(comment._id).populate("authorId", "name initials avatarColor title").lean();
@@ -53,6 +55,8 @@ export const addComment = async (req: AuthenticatedRequest, res: Response): Prom
       actorId: req.user!._id,
       eventType: "COMMENT_ADDED",
       summary: `Comment added on '${task.title}' by ${req.user!.name}`,
+      createdAt: req.body.activityCreatedAt ? new Date(req.body.activityCreatedAt) : (req.body.createdAt ? new Date(req.body.createdAt) : undefined),
+      batchMarker: req.body.batchMarker || (task as any).batchMarker,
     });
 
     // Resolve @mentions for genuine project members only

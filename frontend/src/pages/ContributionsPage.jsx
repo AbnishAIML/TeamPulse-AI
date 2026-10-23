@@ -9,6 +9,7 @@ import {
   Info,
   Calendar,
   Layers,
+  AlertTriangle,
 } from "lucide-react";
 import {
   BarChart,
@@ -22,6 +23,7 @@ import {
 } from "recharts";
 import { analyticsAPI } from "../services/api.js";
 import { useProject } from "../context/ProjectContext.jsx";
+import { getSocket } from "../services/socket.js";
 
 export default function ContributionsPage() {
   const { activeProject } = useProject();
@@ -29,43 +31,74 @@ export default function ContributionsPage() {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadData = async () => {
-      if (!activeProject?._id) return;
-      setLoading(true);
-      try {
-        const [contribRes, actRes] = await Promise.all([
-          analyticsAPI.getContributions(activeProject._id),
-          analyticsAPI.getActivity(activeProject._id, 30),
-        ]);
+  const loadData = async () => {
+    if (!activeProject?._id) return;
+    setLoading(true);
+    try {
+      const [contribRes, actRes] = await Promise.all([
+        analyticsAPI.getContributions(activeProject._id),
+        analyticsAPI.getActivity(activeProject._id, 30),
+      ]);
 
-        if (contribRes.data.success) {
-          setData(contribRes.data.contributions);
-        }
-        if (actRes.data.success) {
-          setActivities(actRes.data.activities);
-        }
-      } catch (err) {
-        console.error("Failed to load contribution data:", err);
-      } finally {
-        setLoading(false);
+      if (contribRes.data.success) {
+        setData(contribRes.data.contributions);
       }
+      if (actRes.data.success) {
+        setActivities(actRes.data.activities);
+      }
+    } catch (err) {
+      console.error("Failed to load contribution data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+
+    const socket = getSocket();
+    if (!socket || !activeProject?._id) return;
+
+    let refreshTimeout = null;
+    const debouncedReload = () => {
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+      refreshTimeout = setTimeout(() => {
+        loadData();
+      }, 500);
     };
 
-    loadData();
+    const handleNewActivity = (act) => {
+      setActivities((prev) => [act, ...prev.filter((a) => a._id !== act._id)]);
+      debouncedReload();
+    };
+
+    socket.on("activity:new", handleNewActivity);
+    socket.on("task:status_changed", debouncedReload);
+    socket.on("task:created", debouncedReload);
+    socket.on("task:updated", debouncedReload);
+
+    return () => {
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+      socket.off("activity:new", handleNewActivity);
+      socket.off("task:status_changed", debouncedReload);
+      socket.off("task:created", debouncedReload);
+      socket.off("task:updated", debouncedReload);
+    };
   }, [activeProject?._id]);
 
   const indicators = data?.team_indicators || [];
 
-  // Format data for Recharts multi-bar comparison
-  const chartData = indicators.map((ind) => ({
-    name: ind.name.split(" ")[0],
-    Completion: ind.task_completion_score,
-    Timeliness: ind.timeliness_score,
-    Review: ind.collaboration_review_score,
-    ProblemSolving: ind.problem_solving_score,
-    Estimation: ind.effort_accuracy_score,
-  }));
+  // Format data for Recharts multi-bar comparison (only include members with sufficient data)
+  const chartData = indicators
+    .filter((ind) => ind.has_sufficient_data !== false)
+    .map((ind) => ({
+      name: ind.name.split(" ")[0],
+      Completion: ind.task_completion_score,
+      Timeliness: ind.timeliness_score,
+      Review: ind.collaboration_review_score,
+      ProblemSolving: ind.problem_solving_score,
+      Estimation: ind.effort_accuracy_score,
+    }));
 
   return (
     <div className="page-wrap">
@@ -145,55 +178,74 @@ export default function ContributionsPage() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
               <strong style={{ fontSize: "14px", color: "#e8ebf5" }}>{ind.name}</strong>
               <div style={{ textAlign: "right" }}>
-                <span style={{ fontSize: "16px", fontWeight: 800, color: "#9b8cff" }}>
-                  {ind.composite_contribution_index}
-                </span>
-                <span style={{ fontSize: "10px", color: "#818ba5" }}> / 100</span>
+                {ind.has_sufficient_data === false ? (
+                  <span style={{ fontSize: "10px", color: "#f59e0b", fontWeight: 700, padding: "2px 7px", background: "#2b2212", borderRadius: "4px", border: "1px solid #593d18" }}>
+                    Pending Data
+                  </span>
+                ) : (
+                  <>
+                    <span style={{ fontSize: "16px", fontWeight: 800, color: "#9b8cff" }}>
+                      {ind.composite_contribution_index}
+                    </span>
+                    <span style={{ fontSize: "10px", color: "#818ba5" }}> / 100</span>
+                  </>
+                )}
               </div>
             </div>
 
-            {/* Indicator Mini Bars */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "16px" }}>
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", marginBottom: "2px" }}>
-                  <span style={{ color: "#818ba5" }}>Completion Velocity</span>
-                  <strong style={{ color: "#e8ebf5" }}>{ind.task_completion_score}%</strong>
+            {ind.has_sufficient_data === false ? (
+              <div style={{ padding: "12px", background: "#182033", borderRadius: "8px", border: "1px dashed #323d5b", marginBottom: "16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#f59e0b", fontSize: "11px", fontWeight: 700, marginBottom: "4px" }}>
+                  <AlertTriangle size={14} /> Insufficient Work Recorded
                 </div>
-                <div style={{ height: "4px", background: "#20283b", borderRadius: "3px", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${ind.task_completion_score}%`, background: "#9b8cff" }} />
-                </div>
+                <p style={{ fontSize: "10px", color: "#9ca5bd", margin: 0, lineHeight: "1.4" }}>
+                  {ind.insufficient_data_reason || "Recently onboarded member with initial scoped work. A score will be calculated once completed deliverables or peer review contributions are recorded."}
+                </p>
               </div>
+            ) : (
+              /* Indicator Mini Bars */
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "16px" }}>
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", marginBottom: "2px" }}>
+                    <span style={{ color: "#818ba5" }}>Completion Velocity</span>
+                    <strong style={{ color: "#e8ebf5" }}>{ind.task_completion_score}%</strong>
+                  </div>
+                  <div style={{ height: "4px", background: "#20283b", borderRadius: "3px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${ind.task_completion_score}%`, background: "#9b8cff" }} />
+                  </div>
+                </div>
 
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", marginBottom: "2px" }}>
-                  <span style={{ color: "#818ba5" }}>On-Time Commitments</span>
-                  <strong style={{ color: "#e8ebf5" }}>{ind.timeliness_score}%</strong>
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", marginBottom: "2px" }}>
+                    <span style={{ color: "#818ba5" }}>On-Time Commitments</span>
+                    <strong style={{ color: "#e8ebf5" }}>{ind.timeliness_score}%</strong>
+                  </div>
+                  <div style={{ height: "4px", background: "#20283b", borderRadius: "3px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${ind.timeliness_score}%`, background: "#72dcb5" }} />
+                  </div>
                 </div>
-                <div style={{ height: "4px", background: "#20283b", borderRadius: "3px", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${ind.timeliness_score}%`, background: "#72dcb5" }} />
-                </div>
-              </div>
 
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", marginBottom: "2px" }}>
-                  <span style={{ color: "#818ba5" }}>Peer Review Stewardship</span>
-                  <strong style={{ color: "#e8ebf5" }}>{ind.collaboration_review_score}%</strong>
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", marginBottom: "2px" }}>
+                    <span style={{ color: "#818ba5" }}>Peer Review Stewardship</span>
+                    <strong style={{ color: "#e8ebf5" }}>{ind.collaboration_review_score}%</strong>
+                  </div>
+                  <div style={{ height: "4px", background: "#20283b", borderRadius: "3px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${ind.collaboration_review_score}%`, background: "#4ca8ff" }} />
+                  </div>
                 </div>
-                <div style={{ height: "4px", background: "#20283b", borderRadius: "3px", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${ind.collaboration_review_score}%`, background: "#4ca8ff" }} />
-                </div>
-              </div>
 
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", marginBottom: "2px" }}>
-                  <span style={{ color: "#818ba5" }}>Problem Solving & Unblocking</span>
-                  <strong style={{ color: "#e8ebf5" }}>{ind.problem_solving_score}%</strong>
-                </div>
-                <div style={{ height: "4px", background: "#20283b", borderRadius: "3px", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${ind.problem_solving_score}%`, background: "#ffbd7c" }} />
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", marginBottom: "2px" }}>
+                    <span style={{ color: "#818ba5" }}>Problem Solving & Unblocking</span>
+                    <strong style={{ color: "#e8ebf5" }}>{ind.problem_solving_score}%</strong>
+                  </div>
+                  <div style={{ height: "4px", background: "#20283b", borderRadius: "3px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${ind.problem_solving_score}%`, background: "#ffbd7c" }} />
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Key Strengths */}
             <div>

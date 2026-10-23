@@ -176,6 +176,9 @@ export const createTask = async (req: AuthenticatedRequest, res: Response): Prom
       remainingHours: estimatedHours ? Number(estimatedHours) : 4,
       dependencies: Array.isArray(dependencies) ? dependencies : [],
       tags: Array.isArray(tags) ? tags : [],
+      createdAt: req.body.createdAt ? new Date(req.body.createdAt) : undefined,
+      completedAt: req.body.completedAt ? new Date(req.body.completedAt) : undefined,
+      batchMarker: req.body.batchMarker || undefined,
     });
 
     // Sync dependencies into TaskDependency collection
@@ -202,6 +205,8 @@ export const createTask = async (req: AuthenticatedRequest, res: Response): Prom
       actorId: req.user!._id,
       eventType: "TASK_CREATED",
       summary: `Created task '${task.title}'`,
+      createdAt: req.body.activityCreatedAt ? new Date(req.body.activityCreatedAt) : (req.body.createdAt ? new Date(req.body.createdAt) : undefined),
+      batchMarker: req.body.batchMarker,
     });
 
     if (assigneeId && assigneeId !== req.user!._id.toString()) {
@@ -418,10 +423,10 @@ export const updateTaskStatus = async (req: AuthenticatedRequest, res: Response)
       }
 
       task.remainingHours = 0;
-      task.completedAt = new Date();
+      task.completedAt = req.body.completedAt ? new Date(req.body.completedAt) : new Date();
       if (task.blocker?.isBlocked) {
         task.blocker.isBlocked = false;
-        task.blocker.resolvedAt = new Date();
+        task.blocker.resolvedAt = req.body.completedAt ? new Date(req.body.completedAt) : new Date();
       }
     }
 
@@ -437,6 +442,8 @@ export const updateTaskStatus = async (req: AuthenticatedRequest, res: Response)
       actorId: req.user!._id,
       eventType: status === "Done" ? "TASK_COMPLETED" : "STATUS_CHANGED",
       summary: `Changed status of '${task.title}' from ${previousStatus} to ${status}`,
+      createdAt: req.body.activityCreatedAt ? new Date(req.body.activityCreatedAt) : undefined,
+      batchMarker: (task as any).batchMarker || req.body.batchMarker,
     });
 
     const populated = await Task.findById(task._id)

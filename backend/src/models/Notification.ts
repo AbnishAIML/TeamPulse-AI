@@ -36,6 +36,7 @@ export interface INotification extends Document {
   dedupKey?: string;
   isRead: boolean;
   readAt?: Date;
+  batchMarker?: string;
   createdAt: Date;
 }
 
@@ -51,6 +52,7 @@ const NotificationSchema = new Schema<INotification>(
     dedupKey: { type: String, unique: true, sparse: true, index: true },
     isRead: { type: Boolean, default: false },
     readAt: { type: Date },
+    batchMarker: { type: String, select: false, index: true },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );

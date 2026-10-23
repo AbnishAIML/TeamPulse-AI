@@ -14,6 +14,7 @@ export interface IUser extends Document {
   refreshTokenHash?: string;
   resetPasswordTokenHash?: string;
   resetPasswordExpires?: Date;
+  batchMarker?: string;
   comparePassword(candidate: string): Promise<boolean>;
   createdAt: Date;
   updatedAt: Date;
@@ -33,6 +34,7 @@ const UserSchema = new Schema<IUser>(
     refreshTokenHash: { type: String, select: false },
     resetPasswordTokenHash: { type: String, select: false },
     resetPasswordExpires: { type: Date, select: false },
+    batchMarker: { type: String, select: false, index: true },
   },
   { timestamps: true }
 );

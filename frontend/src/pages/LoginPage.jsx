@@ -150,10 +150,6 @@ export default function LoginPage({ onSwitchToRegister }) {
           </button>
         </form>
 
-        <div style={{ marginTop: "24px", paddingTop: "16px", borderTop: "1px solid #20283b", fontSize: "11px", color: "#818ba5", textAlign: "center" }}>
-          <span>Optional demo accounts (run <code>npm run seed:demo</code>): <code>lead@demo.local / demo1234</code></span>
-        </div>
-
         <div style={{ marginTop: "20px", textAlign: "center", fontSize: "11px", color: "#818ba5" }}>
           Don't have an account?{" "}
           {onSwitchToRegister ? (

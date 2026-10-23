@@ -39,6 +39,7 @@ export interface ITask extends Document {
   blocker: ITaskBlocker;
   review: ITaskReview;
   completedAt?: Date;
+  batchMarker?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -98,6 +99,7 @@ const TaskSchema = new Schema<ITask>(
     blocker: { type: BlockerSchema, default: () => ({ isBlocked: false }) },
     review: { type: ReviewSchema, default: () => ({ status: "None" }) },
     completedAt: { type: Date },
+    batchMarker: { type: String, select: false, index: true },
   },
   { timestamps: true }
 );

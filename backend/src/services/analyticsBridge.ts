@@ -521,6 +521,31 @@ export class AnalyticsBridge {
 
   private static fallbackContributionAnalysis(projectId: string, members: any[]): any {
     const indicators = members.map((m) => {
+      const isInsufficient =
+        (m.tasks_completed || 0) === 0 &&
+        (m.tasks_assigned || 0) <= 2 &&
+        (m.reviews_conducted || 0) === 0 &&
+        (m.blockers_resolved || 0) === 0;
+
+      if (isInsufficient) {
+        return {
+          user_id: m.user_id,
+          name: m.name,
+          task_completion_score: 0,
+          effort_accuracy_score: 0,
+          collaboration_review_score: 0,
+          problem_solving_score: 0,
+          timeliness_score: 0,
+          composite_contribution_index: 0,
+          key_strengths: ["Recently onboarded — initial deliverable scoped"],
+          has_sufficient_data: false,
+          insufficient_data_reason:
+            "Insufficient completed work or peer review activity has been recorded yet to compute a reliable contribution index.",
+          transparency_notes:
+            "Multi-dimensional indicator reflecting deliverable completions, peer review participation, estimation precision, and blocker resolution.",
+        };
+      }
+
       const taskRatio = m.tasks_assigned > 0 ? Math.min(1, m.tasks_completed / m.tasks_assigned) : 0.5;
       const completionScore = Math.round(taskRatio * 70 + Math.min(30, (m.estimated_hours_completed || 0) * 2));
       const timeliness = m.on_time_completions + m.late_completions > 0
@@ -551,6 +576,8 @@ export class AnalyticsBridge {
         timeliness_score: timeliness,
         composite_contribution_index: composite,
         key_strengths: strengths,
+        has_sufficient_data: true,
+        insufficient_data_reason: null,
         transparency_notes:
           "Multi-dimensional indicator reflecting deliverable completions, peer review participation, estimation precision, and blocker resolution.",
       };

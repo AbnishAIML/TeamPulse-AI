@@ -148,10 +148,12 @@ export const createProject = async (req: AuthenticatedRequest, res: Response): P
         {
           userId: req.user!._id,
           role: "Project Owner",
-          joinedAt: new Date(),
+          joinedAt: req.body.createdAt ? new Date(req.body.createdAt) : new Date(),
           weeklyCapacityHours: req.user!.weeklyCapacityHours || 20,
         },
       ],
+      createdAt: req.body.createdAt ? new Date(req.body.createdAt) : undefined,
+      batchMarker: req.body.batchMarker || undefined,
     });
 
     await logActivity({
@@ -159,6 +161,8 @@ export const createProject = async (req: AuthenticatedRequest, res: Response): P
       actorId: req.user!._id,
       eventType: "WORKLOAD_REBALANCED",
       summary: `Project '${project.name}' created by ${req.user!.name}`,
+      createdAt: req.body.activityCreatedAt ? new Date(req.body.activityCreatedAt) : (req.body.createdAt ? new Date(req.body.createdAt) : undefined),
+      batchMarker: req.body.batchMarker,
     });
 
     res.status(201).json({ success: true, project });

@@ -3,7 +3,7 @@ import { Menu, Search, Bell, AlertTriangle, Clock3, CheckCircle2, X, Check } fro
 import { useAuth } from "../context/AuthContext.jsx";
 import { useProject } from "../context/ProjectContext.jsx";
 import { notificationsAPI } from "../services/api.js";
-import { getSocket } from "../services/socket.js";
+import { getSocket, subscribeConnectionState } from "../services/socket.js";
 
 export default function Topbar({ activeNav, search, setSearch, setMobileNav }) {
   const { user } = useAuth();
@@ -11,6 +11,7 @@ export default function Topbar({ activeNav, search, setSearch, setMobileNav }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [connectionStatus, setConnectionStatus] = useState("offline");
 
   const fetchNotifications = async () => {
     try {
@@ -27,18 +28,25 @@ export default function Topbar({ activeNav, search, setSearch, setMobileNav }) {
   useEffect(() => {
     fetchNotifications();
 
+    const unsubscribeConn = subscribeConnectionState(setConnectionStatus);
+
     // Listen for real-time notifications
     const s = getSocket();
+    let handleNewNotification = null;
     if (s) {
-      const handleNewNotification = (notif) => {
+      handleNewNotification = (notif) => {
         setNotifications((prev) => [notif, ...prev]);
         setUnreadCount((c) => c + 1);
       };
       s.on("notification:new", handleNewNotification);
-      return () => {
-        s.off("notification:new", handleNewNotification);
-      };
     }
+
+    return () => {
+      unsubscribeConn();
+      if (s && handleNewNotification) {
+        s.off("notification:new", handleNewNotification);
+      }
+    };
   }, []);
 
   const markAllRead = async () => {
@@ -77,6 +85,36 @@ export default function Topbar({ activeNav, search, setSearch, setMobileNav }) {
           />
           <kbd>⌘ K</kbd>
         </label>
+
+        {/* Real-Time Connection Indicator */}
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            padding: "4px 8px",
+            borderRadius: "6px",
+            background: connectionStatus === "connected" ? "#122822" : connectionStatus === "reconnecting" ? "#2b2212" : "#24181c",
+            border: `1px solid ${connectionStatus === "connected" ? "#1e4d3d" : connectionStatus === "reconnecting" ? "#593d18" : "#4a2428"}`,
+            fontSize: "10px",
+            fontWeight: 600,
+            color: connectionStatus === "connected" ? "#72dcb5" : connectionStatus === "reconnecting" ? "#f59e0b" : "#ff8c9c",
+            userSelect: "none",
+          }}
+          title={connectionStatus === "connected" ? "Real-time live sync connected via Socket.IO" : connectionStatus === "reconnecting" ? "Attempting to reconnect live sync..." : "Live sync offline"}
+          aria-live="polite"
+        >
+          <span
+            style={{
+              width: "6px",
+              height: "6px",
+              borderRadius: "50%",
+              background: connectionStatus === "connected" ? "#10b981" : connectionStatus === "reconnecting" ? "#f59e0b" : "#ef4444",
+              boxShadow: connectionStatus === "connected" ? "0 0 6px #10b981" : "none",
+            }}
+          />
+          <span>{connectionStatus === "connected" ? "Live" : connectionStatus === "reconnecting" ? "Reconnecting" : "Offline"}</span>
+        </div>
 
         <button
           className="icon-button notification-button"

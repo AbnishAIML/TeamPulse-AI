@@ -30,6 +30,7 @@ export interface IProject extends Document {
   members: IProjectMember[];
   settings: IProjectSettings;
   isArchived: boolean;
+  batchMarker?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -86,6 +87,7 @@ const ProjectSchema = new Schema<IProject>(
       }),
     },
     isArchived: { type: Boolean, default: false },
+    batchMarker: { type: String, select: false, index: true },
   },
   { timestamps: true }
 );

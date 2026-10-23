@@ -29,6 +29,7 @@ export interface IActivityEvent extends Document {
   changes?: Record<string, { from: any; to: any }>;
   details?: Record<string, any>;
   meta?: Record<string, any>;
+  batchMarker?: string;
   createdAt: Date;
 }
 
@@ -43,6 +44,7 @@ const ActivityEventSchema = new Schema<IActivityEvent>(
     changes: { type: Schema.Types.Mixed },
     details: { type: Schema.Types.Mixed },
     meta: { type: Schema.Types.Mixed },
+    batchMarker: { type: String, select: false, index: true },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );

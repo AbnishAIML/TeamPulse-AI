@@ -31,6 +31,7 @@ import {
 import { tasksAPI, workloadAPI, analyticsAPI } from "../services/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useProject } from "../context/ProjectContext.jsx";
+import { getSocket } from "../services/socket.js";
 import TaskDetailModal from "../components/TaskDetailModal.jsx";
 import TaskModal from "../components/TaskModal.jsx";
 
@@ -130,6 +131,34 @@ export default function OverviewPage({ setActiveNav, onOpenCreateTask }) {
 
   useEffect(() => {
     loadDashboardData();
+
+    const socket = getSocket();
+    if (!socket || !activeProject?._id) return;
+
+    let refreshTimeout = null;
+    const debouncedRefresh = () => {
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+      refreshTimeout = setTimeout(() => {
+        loadDashboardData();
+      }, 500);
+    };
+
+    socket.on("task:created", debouncedRefresh);
+    socket.on("task:updated", debouncedRefresh);
+    socket.on("task:status_changed", debouncedRefresh);
+    socket.on("task:deleted", debouncedRefresh);
+    socket.on("workload:rebalanced", debouncedRefresh);
+    socket.on("milestone:updated", debouncedRefresh);
+
+    return () => {
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+      socket.off("task:created", debouncedRefresh);
+      socket.off("task:updated", debouncedRefresh);
+      socket.off("task:status_changed", debouncedRefresh);
+      socket.off("task:deleted", debouncedRefresh);
+      socket.off("workload:rebalanced", debouncedRefresh);
+      socket.off("milestone:updated", debouncedRefresh);
+    };
   }, [activeProject?._id]);
 
   const filteredTasks = useMemo(() => {

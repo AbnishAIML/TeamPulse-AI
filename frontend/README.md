@@ -28,3 +28,8 @@ A React + Vite dashboard prototype for the Intelligent Project Management and Te
 
 ## Important
 This is a frontend prototype with sample/demo data. It is not connected to a backend or database yet. Some navigation pages reuse the dashboard shell; API integration, real authentication, persistent data, task dependencies and actual AI calculations are next steps.
+
+
+
+
+

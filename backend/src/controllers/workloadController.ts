@@ -87,6 +87,8 @@ export const applyRedistribution = async (req: AuthenticatedRequest, res: Respon
       actorId: req.user!._id,
       eventType: "WORKLOAD_REBALANCED",
       summary: `Workload Rebalanced: '${task.title}' reassigned to ${proposedUser.name}. Reason: ${reason || "Workload capacity optimization"}`,
+      createdAt: req.body.activityCreatedAt ? new Date(req.body.activityCreatedAt) : undefined,
+      batchMarker: (task as any).batchMarker || req.body.batchMarker,
     });
 
     const notif = await Notification.create({

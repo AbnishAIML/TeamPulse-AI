@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { workloadAPI } from "../services/api.js";
 import { useProject } from "../context/ProjectContext.jsx";
+import { getSocket } from "../services/socket.js";
 
 export default function WorkloadPage() {
   const { activeProject } = useProject();
@@ -42,6 +43,32 @@ export default function WorkloadPage() {
 
   useEffect(() => {
     loadWorkload();
+
+    const socket = getSocket();
+    if (!socket || !activeProject?._id) return;
+
+    let refreshTimeout = null;
+    const debouncedReload = () => {
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+      refreshTimeout = setTimeout(() => {
+        loadWorkload();
+      }, 500);
+    };
+
+    socket.on("workload:rebalanced", debouncedReload);
+    socket.on("task:status_changed", debouncedReload);
+    socket.on("task:created", debouncedReload);
+    socket.on("task:updated", debouncedReload);
+    socket.on("task:deleted", debouncedReload);
+
+    return () => {
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+      socket.off("workload:rebalanced", debouncedReload);
+      socket.off("task:status_changed", debouncedReload);
+      socket.off("task:created", debouncedReload);
+      socket.off("task:updated", debouncedReload);
+      socket.off("task:deleted", debouncedReload);
+    };
   }, [activeProject?._id]);
 
   const handleApplyRecommendation = async (rec) => {

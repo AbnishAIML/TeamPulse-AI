@@ -68,6 +68,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       title: title || "Software Engineer",
       weeklyCapacityHours: weeklyCapacityHours ? Number(weeklyCapacityHours) : 20,
       skills: Array.isArray(skills) ? skills : [],
+      batchMarker: req.body.batchMarker || undefined,
     });
 
     const { token, refreshToken, refreshTokenHash } = generateTokens(user._id.toString());

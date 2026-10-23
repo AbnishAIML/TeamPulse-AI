@@ -47,6 +47,7 @@ export const uploadAttachment = async (req: AuthenticatedRequest, res: Response)
       mimeType: file.mimetype,
       sizeBytes: file.size,
       filePath: file.path,
+      batchMarker: req.body.batchMarker || (task as any).batchMarker,
     });
 
     const populated = await Attachment.findById(attachment._id).populate("uploaderId", "name initials avatarColor").lean();

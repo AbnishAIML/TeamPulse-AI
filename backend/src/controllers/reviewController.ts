@@ -131,7 +131,7 @@ export const reviewDecision = async (req: AuthenticatedRequest, res: Response): 
     if (decision === "Approved") {
       task.status = "Done";
       task.remainingHours = 0;
-      task.completedAt = new Date();
+      task.completedAt = req.body.completedAt ? new Date(req.body.completedAt) : new Date();
     } else {
       task.status = "In Progress";
     }
@@ -150,7 +150,7 @@ export const reviewDecision = async (req: AuthenticatedRequest, res: Response): 
             milestone.progressPct = progressPct;
             if (progressPct === 100) {
               milestone.status = "Completed";
-              milestone.completedAt = new Date();
+              milestone.completedAt = req.body.completedAt ? new Date(req.body.completedAt) : new Date();
             } else if (new Date(milestone.dueDate) < new Date()) {
               milestone.status = "Overdue";
             } else {
@@ -171,7 +171,7 @@ export const reviewDecision = async (req: AuthenticatedRequest, res: Response): 
         reviewer: req.user!._id,
         status: decision,
         feedback: feedback || "",
-        decidedAt: new Date(),
+        decidedAt: req.body.completedAt ? new Date(req.body.completedAt) : new Date(),
       },
       { sort: { requestedAt: -1 } }
     );
@@ -183,6 +183,8 @@ export const reviewDecision = async (req: AuthenticatedRequest, res: Response): 
       actorId: req.user!._id,
       eventType,
       summary: `Review ${decision.toLowerCase()} for '${task.title}' by ${req.user!.name}. Feedback: "${feedback || "None"}"`,
+      createdAt: req.body.activityCreatedAt ? new Date(req.body.activityCreatedAt) : (req.body.completedAt ? new Date(req.body.completedAt) : undefined),
+      batchMarker: (task as any).batchMarker || req.body.batchMarker,
     });
 
     if (task.assigneeId) {

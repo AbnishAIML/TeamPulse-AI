@@ -9,6 +9,7 @@ export interface IMilestone extends Document {
   status: "Planning" | "In Progress" | "Completed" | "Overdue";
   progressPct: number;
   completedAt?: Date;
+  batchMarker?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -27,6 +28,7 @@ const MilestoneSchema = new Schema<IMilestone>(
     },
     progressPct: { type: Number, default: 0, min: 0, max: 100 },
     completedAt: { type: Date },
+    batchMarker: { type: String, select: false, index: true },
   },
   { timestamps: true }
 );

@@ -5,6 +5,7 @@ export interface IComment extends Document {
   projectId: Types.ObjectId;
   authorId: Types.ObjectId;
   text: string;
+  batchMarker?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -15,6 +16,7 @@ const CommentSchema = new Schema<IComment>(
     projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true, index: true },
     authorId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     text: { type: String, required: true, trim: true },
+    batchMarker: { type: String, select: false, index: true },
   },
   { timestamps: true }
 );

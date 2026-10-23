@@ -9,6 +9,7 @@ export interface IAttachment extends Document {
   mimeType: string;
   sizeBytes: number;
   filePath: string;
+  batchMarker?: string;
   createdAt: Date;
 }
 
@@ -22,6 +23,7 @@ const AttachmentSchema = new Schema<IAttachment>(
     mimeType: { type: String, required: true },
     sizeBytes: { type: Number, required: true },
     filePath: { type: String, required: true },
+    batchMarker: { type: String, select: false, index: true },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );

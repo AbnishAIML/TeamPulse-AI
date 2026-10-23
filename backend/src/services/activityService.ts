@@ -9,6 +9,8 @@ interface LogActivityParams {
   eventType: ActivityEventType;
   summary: string;
   details?: Record<string, any>;
+  createdAt?: Date;
+  batchMarker?: string;
 }
 
 export const logActivity = async (params: LogActivityParams): Promise<void> => {
@@ -20,6 +22,8 @@ export const logActivity = async (params: LogActivityParams): Promise<void> => {
       eventType: params.eventType,
       summary: params.summary,
       details: params.details || {},
+      createdAt: params.createdAt || new Date(),
+      batchMarker: params.batchMarker,
     });
 
     const populated = await ActivityEvent.findById(event._id).populate("actorId", "name initials avatarColor");

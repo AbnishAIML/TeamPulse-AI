@@ -173,6 +173,8 @@ export const addDependency = async (req: AuthenticatedRequest, res: Response): P
       actorId: req.user!._id,
       eventType: "DEPENDENCY_ADDED",
       summary: `Added dependency: '${task.title}' now depends on '${predTask.title}'`,
+      createdAt: req.body.activityCreatedAt ? new Date(req.body.activityCreatedAt) : undefined,
+      batchMarker: (task as any).batchMarker || req.body.batchMarker,
     });
 
     emitToProject(task.projectId.toString(), "dependency:changed", {

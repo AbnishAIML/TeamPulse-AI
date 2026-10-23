@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { dependenciesAPI, tasksAPI } from "../services/api.js";
 import { useProject } from "../context/ProjectContext.jsx";
+import { getSocket } from "../services/socket.js";
 
 export default function DependenciesPage() {
   const { activeProject } = useProject();
@@ -65,6 +66,32 @@ export default function DependenciesPage() {
 
   useEffect(() => {
     loadDependencies();
+
+    const socket = getSocket();
+    if (!socket || !activeProject?._id) return;
+
+    let refreshTimeout = null;
+    const debouncedReload = () => {
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+      refreshTimeout = setTimeout(() => {
+        loadDependencies();
+      }, 500);
+    };
+
+    socket.on("dependency:changed", debouncedReload);
+    socket.on("task:status_changed", debouncedReload);
+    socket.on("task:created", debouncedReload);
+    socket.on("task:updated", debouncedReload);
+    socket.on("task:deleted", debouncedReload);
+
+    return () => {
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+      socket.off("dependency:changed", debouncedReload);
+      socket.off("task:status_changed", debouncedReload);
+      socket.off("task:created", debouncedReload);
+      socket.off("task:updated", debouncedReload);
+      socket.off("task:deleted", debouncedReload);
+    };
   }, [activeProject?._id]);
 
   const handleAddDependency = async (e) => {

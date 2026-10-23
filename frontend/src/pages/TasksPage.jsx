@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { tasksAPI, milestonesAPI } from "../services/api.js";
 import { useProject } from "../context/ProjectContext.jsx";
+import { getSocket } from "../services/socket.js";
 import TaskDetailModal from "../components/TaskDetailModal.jsx";
 import TaskModal from "../components/TaskModal.jsx";
 
@@ -69,6 +70,49 @@ export default function TasksPage({ onOpenCreateTask, showCreateModal, setShowCr
 
   useEffect(() => {
     loadTasks();
+
+    const socket = getSocket();
+    if (!socket || !activeProject?._id) return;
+
+    const onTaskCreated = (newTask) => {
+      setTasks((prev) => (prev.some((t) => t._id === newTask._id) ? prev.map((t) => (t._id === newTask._id ? newTask : t)) : [newTask, ...prev]));
+    };
+
+    const onTaskUpdated = (updatedTask) => {
+      setTasks((prev) => prev.map((t) => (t._id === updatedTask._id ? updatedTask : t)));
+    };
+
+    const onTaskStatusChanged = (updatedTask) => {
+      setTasks((prev) => prev.map((t) => (t._id === updatedTask._id ? updatedTask : t)));
+    };
+
+    const onTaskDeleted = ({ taskId }) => {
+      setTasks((prev) => prev.filter((t) => t._id !== taskId));
+    };
+
+    const onMilestoneUpdated = () => {
+      milestonesAPI.getMilestones(activeProject._id).then((res) => {
+        if (res.data.success) setMilestones(res.data.milestones);
+      }).catch(() => {});
+    };
+
+    socket.on("task:created", onTaskCreated);
+    socket.on("task:updated", onTaskUpdated);
+    socket.on("task:status_changed", onTaskStatusChanged);
+    socket.on("task:deleted", onTaskDeleted);
+    socket.on("milestone:created", onMilestoneUpdated);
+    socket.on("milestone:updated", onMilestoneUpdated);
+    socket.on("milestone:deleted", onMilestoneUpdated);
+
+    return () => {
+      socket.off("task:created", onTaskCreated);
+      socket.off("task:updated", onTaskUpdated);
+      socket.off("task:status_changed", onTaskStatusChanged);
+      socket.off("task:deleted", onTaskDeleted);
+      socket.off("milestone:created", onMilestoneUpdated);
+      socket.off("milestone:updated", onMilestoneUpdated);
+      socket.off("milestone:deleted", onMilestoneUpdated);
+    };
   }, [activeProject?._id]);
 
   const filteredTasks = useMemo(() => {

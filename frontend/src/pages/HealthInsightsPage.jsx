@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { analyticsAPI } from "../services/api.js";
 import { useProject } from "../context/ProjectContext.jsx";
+import { getSocket } from "../services/socket.js";
 
 export default function HealthInsightsPage({ setActiveNav }) {
   const { activeProject } = useProject();
@@ -19,24 +20,52 @@ export default function HealthInsightsPage({ setActiveNav }) {
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadHealth = async () => {
-      if (!activeProject?._id) return;
-      setLoading(true);
-      try {
-        const res = await analyticsAPI.getHealth(activeProject._id);
-        if (res.data.success) {
-          setHealth(res.data.health);
-          setMetrics(res.data.metrics);
-        }
-      } catch (err) {
-        console.error("Failed to load health insights:", err);
-      } finally {
-        setLoading(false);
+  const loadHealth = async () => {
+    if (!activeProject?._id) return;
+    setLoading(true);
+    try {
+      const res = await analyticsAPI.getHealth(activeProject._id);
+      if (res.data.success) {
+        setHealth(res.data.health);
+        setMetrics(res.data.metrics);
       }
+    } catch (err) {
+      console.error("Failed to load health insights:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadHealth();
+
+    const socket = getSocket();
+    if (!socket || !activeProject?._id) return;
+
+    let refreshTimeout = null;
+    const debouncedReload = () => {
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+      refreshTimeout = setTimeout(() => {
+        loadHealth();
+      }, 500);
     };
 
-    loadHealth();
+    socket.on("task:status_changed", debouncedReload);
+    socket.on("task:created", debouncedReload);
+    socket.on("task:updated", debouncedReload);
+    socket.on("task:deleted", debouncedReload);
+    socket.on("milestone:updated", debouncedReload);
+    socket.on("dependency:changed", debouncedReload);
+
+    return () => {
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+      socket.off("task:status_changed", debouncedReload);
+      socket.off("task:created", debouncedReload);
+      socket.off("task:updated", debouncedReload);
+      socket.off("task:deleted", debouncedReload);
+      socket.off("milestone:updated", debouncedReload);
+      socket.off("dependency:changed", debouncedReload);
+    };
   }, [activeProject?._id]);
 
   const hasSufficientData = health && health.factors && health.factors.length >= 3;

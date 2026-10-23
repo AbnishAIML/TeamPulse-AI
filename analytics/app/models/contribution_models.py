@@ -34,6 +34,8 @@ class ContributionIndicator(BaseModel):
     composite_contribution_index: float # 0 - 100 transparent weighted composite score
     key_strengths: List[str]
     transparency_notes: str # Explanation that this is an indicative signal, not a measure of individual worth
+    has_sufficient_data: bool = True
+    insufficient_data_reason: Optional[str] = None
 
 class ContributionAnalysisResponse(BaseModel):
     project_id: str
