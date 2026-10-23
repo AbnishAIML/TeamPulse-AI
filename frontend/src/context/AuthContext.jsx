@@ -58,10 +58,6 @@ export const AuthProvider = ({ children }) => {
     throw new Error(res.data.message || "Registration failed");
   };
 
-  const demoLogin = async (email = "ankit@teampulse.ai") => {
-    return login(email, "password123");
-  };
-
   const logout = () => {
     localStorage.removeItem("teampulse_token");
     setToken(null);
@@ -69,7 +65,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, demoLogin, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

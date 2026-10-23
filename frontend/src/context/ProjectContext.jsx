@@ -25,6 +25,8 @@ export const ProjectProvider = ({ children }) => {
           const current = found || res.data.projects[0];
           setActiveProject(current);
           joinProjectRoom(current._id);
+        } else {
+          setActiveProject(null);
         }
       }
     } catch (err) {

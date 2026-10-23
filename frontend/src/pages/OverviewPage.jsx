@@ -149,29 +149,64 @@ export default function OverviewPage({ setActiveNav, onOpenCreateTask }) {
     }
   };
 
-  // Trend chart data (dynamic mock curve based on completed tasks)
+  // Real 7-day velocity calculated strictly from task event timestamps
   const trendData = useMemo(() => {
-    const doneCount = tasks.filter((t) => t.status === "Done").length;
-    return [
-      { day: "Mon", completed: Math.max(1, doneCount - 5), created: 3 },
-      { day: "Tue", completed: Math.max(2, doneCount - 4), created: 4 },
-      { day: "Wed", completed: Math.max(3, doneCount - 3), created: 2 },
-      { day: "Thu", completed: Math.max(4, doneCount - 2), created: 5 },
-      { day: "Fri", completed: Math.max(4, doneCount - 1), created: 3 },
-      { day: "Sat", completed: doneCount, created: 2 },
-      { day: "Sun", completed: doneCount, created: 1 },
-    ];
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const now = new Date();
+    const last7 = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(now);
+      d.setDate(now.getDate() - (6 - i));
+      return {
+        dateStr: d.toISOString().slice(0, 10),
+        day: days[d.getDay()],
+        completed: 0,
+        created: 0,
+      };
+    });
+
+    tasks.forEach((t) => {
+      if (t.createdAt) {
+        const createdDate = new Date(t.createdAt).toISOString().slice(0, 10);
+        const match = last7.find((p) => p.dateStr === createdDate);
+        if (match) match.created += 1;
+      }
+      if (t.status === "Done" && t.completedAt) {
+        const compDate = new Date(t.completedAt).toISOString().slice(0, 10);
+        const match = last7.find((p) => p.dateStr === compDate);
+        if (match) match.completed += 1;
+      }
+    });
+
+    return last7;
   }, [tasks]);
 
-  const totalTasks = tasks.length;
-  const completedTasks = tasks.filter((t) => t.status === "Done").length;
-  const overdueTasks = tasks.filter(
+  const activeTasks = useMemo(() => tasks.filter((t) => t.status !== "Archived" && t.status !== "Cancelled"), [tasks]);
+  const totalTasks = activeTasks.length;
+  const completedTasks = activeTasks.filter((t) => t.status === "Done").length;
+  const inProgressTasks = activeTasks.filter((t) => t.status === "In Progress").length;
+  const overdueTasks = activeTasks.filter(
     (t) => t.status !== "Done" && t.deadline && new Date(t.deadline) < new Date()
   ).length;
-  const blockedTasks = tasks.filter((t) => t.status === "Blocked" || t.blocker?.isBlocked).length;
+  const blockedTasks = activeTasks.filter((t) => t.status === "Blocked" || t.blocker?.isBlocked).length;
 
-  const healthScore = healthData?.health_score || 72;
-  const riskLevel = healthData?.risk_level || "At Risk";
+  // Section 2.4b: Completion Rate and Effort-Weighted Completion Rate
+  const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const totalEstimatedHours = activeTasks.reduce((acc, t) => acc + (t.estimatedHours || 0), 0);
+  const doneEstimatedHours = activeTasks.filter((t) => t.status === "Done").reduce((acc, t) => acc + (t.estimatedHours || 0), 0);
+  const effortWeightedRate = totalEstimatedHours > 0 ? Math.round((doneEstimatedHours / totalEstimatedHours) * 100) : null;
+
+  // Real average team capacity utilization from workload metrics
+  const avgUtil = useMemo(() => {
+    if (!workloadData || workloadData.length === 0) return null;
+    const totalCap = workloadData.reduce((acc, m) => acc + (m.capacity || 0), 0);
+    const totalRem = workloadData.reduce((acc, m) => acc + (m.assigned || 0), 0);
+    if (totalCap <= 0) return null;
+    return Math.round((totalRem / totalCap) * 100);
+  }, [workloadData]);
+
+  const hasHealthData = healthData && healthData.factors && healthData.factors.length >= 3;
+  const healthScore = hasHealthData ? healthData.health_score : null;
+  const riskLevel = hasHealthData ? healthData.risk_level : "Insufficient data";
 
   return (
     <div className="page-wrap">
@@ -180,9 +215,9 @@ export default function OverviewPage({ setActiveNav, onOpenCreateTask }) {
           <div className="eyebrow">
             <span className="live-dot" /> WORKSPACE OVERVIEW
           </div>
-          <h1>Good day, {user?.name?.split(" ")[0] || "Ankit"} 👋</h1>
+          <h1>Good day, {user?.name?.split(" ")[0] || "Team Member"} 👋</h1>
           <p>
-            Here's what's happening across <strong>{activeProject?.name || "TeamPulse AI"}</strong> today.
+            Here's what's happening across <strong>{activeProject?.name || "Active Project"}</strong> today.
           </p>
         </div>
         <div className="heading-actions">
@@ -200,38 +235,38 @@ export default function OverviewPage({ setActiveNav, onOpenCreateTask }) {
         <StatCard
           label="Total Tasks"
           value={totalTasks}
-          change="+12%"
+          change={inProgressTasks > 0 ? `${inProgressTasks} active` : undefined}
           direction="up"
           icon={ListTodo}
           tone="purple"
-          note="Active sprint backlog"
+          note={totalTasks > 0 ? `${inProgressTasks} in progress` : "No tasks in sprint"}
         />
         <StatCard
-          label="Completed"
-          value={completedTasks}
-          change={`${totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0}%`}
+          label="Completion Rate"
+          value={`${completionRate}%`}
+          change={effortWeightedRate !== null ? `${effortWeightedRate}% effort` : undefined}
           direction="up"
           icon={CheckCircle2}
           tone="green"
-          note="Completion rate on target"
+          note={effortWeightedRate !== null ? `Effort-weighted: ${effortWeightedRate}%` : `${completedTasks} of ${totalTasks} completed`}
         />
         <StatCard
           label="Overdue Tasks"
           value={overdueTasks}
-          change={overdueTasks > 0 ? "Requires Action" : "None"}
+          change={overdueTasks > 0 ? "Requires Action" : undefined}
           direction="down"
           icon={Clock3}
           tone="orange"
-          note="Past target deadlines"
+          note={overdueTasks > 0 ? "Past deadline" : "All tasks on schedule"}
         />
         <StatCard
           label="Project Health"
-          value={`${healthScore}/100`}
+          value={healthScore !== null ? `${healthScore}/100` : "—"}
           change={riskLevel}
-          direction={healthScore >= 80 ? "up" : "down"}
+          direction={healthScore !== null && healthScore >= 75 ? "up" : "down"}
           icon={Gauge}
-          tone={healthScore >= 80 ? "green" : healthScore >= 50 ? "orange" : "red"}
-          note={`${blockedTasks} active blocker(s)`}
+          tone={healthScore !== null ? (healthScore >= 75 ? "green" : healthScore >= 50 ? "orange" : "red") : "purple"}
+          note={hasHealthData ? `${blockedTasks} active blocker(s)` : "Needs 3+ factor metrics"}
         />
       </section>
 
@@ -326,12 +361,17 @@ export default function OverviewPage({ setActiveNav, onOpenCreateTask }) {
             <div
               className="health-ring"
               style={{
-                background: `conic-gradient(#9b8cff 0 ${healthScore}%, #2a3047 ${healthScore}% 100%)`,
+                background:
+                  healthScore !== null
+                    ? `conic-gradient(#9b8cff 0 ${healthScore}%, #2a3047 ${healthScore}% 100%)`
+                    : "#2a3047",
               }}
             >
               <div>
-                <strong>{healthScore}</strong>
-                <span>/ 100</span>
+                <strong style={{ fontSize: healthScore !== null ? "29px" : "20px" }}>
+                  {healthScore !== null ? healthScore : "—"}
+                </strong>
+                <span>{healthScore !== null ? "/ 100" : "N/A"}</span>
               </div>
             </div>
             <div className="health-status">
@@ -339,10 +379,12 @@ export default function OverviewPage({ setActiveNav, onOpenCreateTask }) {
                 <i /> {riskLevel}
               </span>
               <p>
-                {healthData?.summary ||
-                  (blockedTasks > 0
-                    ? `${blockedTasks} blocker(s) affecting downstream delivery.`
-                    : "Schedule is tracking smoothly.")}
+                {hasHealthData
+                  ? healthData?.summary ||
+                    (blockedTasks > 0
+                      ? `${blockedTasks} blocker(s) affecting downstream delivery.`
+                      : "Schedule is tracking smoothly.")
+                  : "Insufficient project data to evaluate risk. Add milestones and task estimates."}
               </p>
             </div>
           </div>
@@ -350,20 +392,20 @@ export default function OverviewPage({ setActiveNav, onOpenCreateTask }) {
           <div className="health-metrics">
             <div>
               <span>Completed Scope</span>
-              <strong>{totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0}%</strong>
+              <strong>{totalTasks > 0 ? `${completionRate}%` : "0%"}</strong>
               <div className="mini-track">
                 <i
                   style={{
-                    width: `${totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0}%`,
+                    width: `${completionRate}%`,
                   }}
                 />
               </div>
             </div>
             <div>
               <span>Team Utilization</span>
-              <strong>78%</strong>
+              <strong>{avgUtil !== null ? `${avgUtil}%` : "Not set"}</strong>
               <div className="mini-track blue-track">
-                <i style={{ width: "78%" }} />
+                <i style={{ width: `${Math.min(100, avgUtil || 0)}%` }} />
               </div>
             </div>
           </div>
@@ -490,43 +532,60 @@ export default function OverviewPage({ setActiveNav, onOpenCreateTask }) {
           <div className="panel-header">
             <div>
               <h2>Team Workload</h2>
-              <p>Assigned hours vs weekly capacity (20h)</p>
+              <p>Assigned hours vs configured weekly capacity</p>
             </div>
-            <button className="icon-button" onClick={() => setActiveNav("Team workload")}>
+            <button className="icon-button" onClick={() => setActiveNav("Team workload")} aria-label="Team workload">
               <ArrowUpRight size={17} />
             </button>
           </div>
 
           <div className="workload-chart">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={workloadData} barGap={5} margin={{ top: 8, right: 0, left: -22, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 5" vertical={false} stroke="#242b3d" />
-                <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: "#818ba5", fontSize: 11 }} />
-                <YAxis tickLine={false} axisLine={false} tick={{ fill: "#818ba5", fontSize: 11 }} />
-                <Tooltip
-                  contentStyle={{
-                    background: "#151c30",
-                    border: "1px solid #303951",
-                    borderRadius: 10,
-                    color: "#fff",
-                  }}
-                />
-                <Bar dataKey="capacity" name="Capacity" fill="#303951" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="assigned" name="Assigned Hours" fill="#8b7cff" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {workloadData.length === 0 ? (
+              <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#818ba5", fontSize: "11px", textAlign: "center", padding: "20px" }}>
+                No team workload data available yet. Add members and assign estimated tasks to track workload.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={workloadData} barGap={5} margin={{ top: 8, right: 0, left: -22, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 5" vertical={false} stroke="#242b3d" />
+                  <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: "#818ba5", fontSize: 11 }} />
+                  <YAxis tickLine={false} axisLine={false} tick={{ fill: "#818ba5", fontSize: 11 }} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#151c30",
+                      border: "1px solid #303951",
+                      borderRadius: 10,
+                      color: "#fff",
+                    }}
+                  />
+                  <Bar dataKey="capacity" name="Capacity" fill="#303951" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="assigned" name="Assigned Hours" fill="#8b7cff" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
 
-          <div className="workload-alert">
-            <span className="alert-icon">
-              <AlertTriangle size={16} />
-            </span>
-            <div>
-              <strong>Rahul is operating over capacity</strong>
-              <p>24h assigned against 20h capacity. Rebalancing recommended.</p>
+          {workloadData.find((m) => m.capacity > 0 && m.assigned > m.capacity) ? (
+            (() => {
+              const overloaded = workloadData.find((m) => m.capacity > 0 && m.assigned > m.capacity);
+              return (
+                <div className="workload-alert">
+                  <span className="alert-icon">
+                    <AlertTriangle size={16} />
+                  </span>
+                  <div>
+                    <strong>{overloaded.name} is operating over capacity</strong>
+                    <p>{overloaded.assigned}h assigned against {overloaded.capacity}h weekly capacity. Rebalancing recommended.</p>
+                  </div>
+                  <button onClick={() => setActiveNav("Team workload")}>Review</button>
+                </div>
+              );
+            })()
+          ) : (
+            <div style={{ padding: "10px 14px", background: "#111b24", border: "1px solid #1d3330", borderRadius: "8px", marginTop: "8px", fontSize: "11px", color: "#72dcb5", display: "flex", alignItems: "center", gap: "8px" }}>
+              <CheckCircle2 size={15} /> All assigned team members are within healthy weekly capacity limits.
             </div>
-            <button onClick={() => setActiveNav("Team workload")}>Review</button>
-          </div>
+          )}
 
           <button className="text-link full-link" onClick={() => setActiveNav("Team workload")}>
             View Team Capacity Breakdown <ArrowUpRight size={15} />

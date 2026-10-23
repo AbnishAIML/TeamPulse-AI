@@ -3,7 +3,7 @@ import { Zap, AlertCircle, ArrowRight, UserCheck } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 
 export default function LoginPage({ onSwitchToRegister }) {
-  const { login, demoLogin } = useAuth();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -17,18 +17,6 @@ export default function LoginPage({ onSwitchToRegister }) {
       await login(email, password);
     } catch (err) {
       setError(err.message || "Invalid credentials.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleQuickDemo = async (demoEmail) => {
-    setError("");
-    setLoading(true);
-    try {
-      await demoLogin(demoEmail);
-    } catch (err) {
-      setError("Demo login failed. Make sure backend is running and seeded.");
     } finally {
       setLoading(false);
     }
@@ -99,7 +87,7 @@ export default function LoginPage({ onSwitchToRegister }) {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. ankit@teampulse.ai"
+              placeholder="your.email@organization.com"
               required
             />
           </label>
@@ -125,95 +113,8 @@ export default function LoginPage({ onSwitchToRegister }) {
           </button>
         </form>
 
-        {/* 1-Click College Demo Accounts */}
-        <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid #20283b" }}>
-          <span
-            style={{
-              fontSize: "9px",
-              color: "#818ba5",
-              textTransform: "uppercase",
-              letterSpacing: "1px",
-              fontWeight: 700,
-              display: "block",
-              marginBottom: "10px",
-            }}
-          >
-            Instant Demo Sign-In (Evaluation Mode)
-          </span>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-            <button
-              type="button"
-              onClick={() => handleQuickDemo("ankit@teampulse.ai")}
-              style={{
-                background: "#161b2e",
-                border: "1px solid #28334e",
-                borderRadius: "8px",
-                padding: "8px 10px",
-                color: "#e8ebf5",
-                fontSize: "10px",
-                textAlign: "left",
-                cursor: "pointer",
-              }}
-            >
-              <strong style={{ display: "block", color: "#a9d0ff" }}>Ankit Kumar</strong>
-              <small style={{ color: "#818ba5" }}>Project Owner</small>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickDemo("rahul@teampulse.ai")}
-              style={{
-                background: "#161b2e",
-                border: "1px solid #28334e",
-                borderRadius: "8px",
-                padding: "8px 10px",
-                color: "#e8ebf5",
-                fontSize: "10px",
-                textAlign: "left",
-                cursor: "pointer",
-              }}
-            >
-              <strong style={{ display: "block", color: "#b9afff" }}>Rahul Sharma</strong>
-              <small style={{ color: "#ff9ca9" }}>Overloaded (24h)</small>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickDemo("priya@teampulse.ai")}
-              style={{
-                background: "#161b2e",
-                border: "1px solid #28334e",
-                borderRadius: "8px",
-                padding: "8px 10px",
-                color: "#e8ebf5",
-                fontSize: "10px",
-                textAlign: "left",
-                cursor: "pointer",
-              }}
-            >
-              <strong style={{ display: "block", color: "#ffc2dc" }}>Priya Mehta</strong>
-              <small style={{ color: "#ffbd7c" }}>Blocked Task</small>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickDemo("arjun@teampulse.ai")}
-              style={{
-                background: "#161b2e",
-                border: "1px solid #28334e",
-                borderRadius: "8px",
-                padding: "8px 10px",
-                color: "#e8ebf5",
-                fontSize: "10px",
-                textAlign: "left",
-                cursor: "pointer",
-              }}
-            >
-              <strong style={{ display: "block", color: "#a7f0d7" }}>Arjun Verma</strong>
-              <small style={{ color: "#72dcb5" }}>QA / Reviewer</small>
-            </button>
-          </div>
+        <div style={{ marginTop: "24px", paddingTop: "16px", borderTop: "1px solid #20283b", fontSize: "11px", color: "#818ba5", textAlign: "center" }}>
+          <span>Tip: To populate an optional test workspace, run <code>npm run seed:demo</code> (demo login: <code>lead@demo.local / demo1234</code>).</span>
         </div>
 
         <div style={{ marginTop: "20px", textAlign: "center", fontSize: "11px", color: "#818ba5" }}>

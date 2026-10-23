@@ -88,8 +88,8 @@ export default function Topbar({ activeNav, search, setSearch, setMobileNav }) {
           {unreadCount > 0 && <i></i>}
         </button>
 
-        <span className={`avatar avatar-${user?.avatarColor || "blue"}`} title={user?.name}>
-          {user?.initials || "AK"}
+        <span className={`avatar avatar-${user?.avatarColor || "blue"}`} title={user?.name || "User Profile"}>
+          {user?.initials || (user?.name ? user.name.slice(0, 2).toUpperCase() : "U")}
         </span>
       </div>
 

@@ -39,8 +39,9 @@ export default function HealthInsightsPage({ setActiveNav }) {
     loadHealth();
   }, [activeProject?._id]);
 
-  const score = health?.health_score || 72;
-  const risk = health?.risk_level || "At Risk";
+  const hasSufficientData = health && health.factors && health.factors.length >= 3;
+  const score = hasSufficientData ? health.health_score : null;
+  const risk = hasSufficientData ? health.risk_level : "Insufficient data";
   const factors = health?.factors || [];
   const recommendations = health?.recommendations || [];
 
@@ -75,12 +76,12 @@ export default function HealthInsightsPage({ setActiveNav }) {
             style={{
               width: "120px",
               height: "120px",
-              background: `conic-gradient(#9b8cff 0 ${score}%, #283049 ${score}% 100%)`,
+              background: score !== null ? `conic-gradient(#9b8cff 0 ${score}%, #283049 ${score}% 100%)` : "#283049",
             }}
           >
             <div>
-              <strong style={{ fontSize: "32px" }}>{score}</strong>
-              <span style={{ fontSize: "10px", color: "#8993ad" }}>/ 100</span>
+              <strong style={{ fontSize: score !== null ? "32px" : "22px" }}>{score !== null ? score : "—"}</strong>
+              <span style={{ fontSize: "10px", color: "#8993ad" }}>{score !== null ? "/ 100" : "N/A"}</span>
             </div>
           </div>
 
@@ -90,15 +91,18 @@ export default function HealthInsightsPage({ setActiveNav }) {
                 <i /> {risk.toUpperCase()}
               </span>
               <span style={{ fontSize: "11px", color: "#818ba5" }}>
-                Derived from {factors.length} weighted risk dimensions
+                {factors.length > 0 ? `Derived from ${factors.length} weighted risk dimensions` : "Requires at least 3 factors with data"}
               </span>
             </div>
             <h2 style={{ fontSize: "16px", color: "#e8ebf5", margin: "8px 0 6px" }}>
-              {health?.summary || "Project requires active mitigation."}
+              {hasSufficientData
+                ? health?.summary || "Project health evaluated from active schedule and tasks."
+                : "Insufficient data to compute health score."}
             </h2>
             <p style={{ fontSize: "11px", color: "#9ca5bd", margin: 0, lineHeight: "1.5" }}>
-              Schedule float and critical path tasks indicate that immediate unblocking of upstream deliverables is required
-              to guarantee target milestone dates.
+              {hasSufficientData
+                ? "Schedule float and critical path tasks indicate continuous evaluation across deliverables."
+                : "To enable intelligent health analysis, create project milestones, assign tasks with estimated effort hours, and configure team member weekly capacities."}
             </p>
           </div>
         </div>
@@ -106,38 +110,49 @@ export default function HealthInsightsPage({ setActiveNav }) {
 
       {/* Contributing Factors Breakdown */}
       <h2 style={{ fontSize: "14px", marginBottom: "14px" }}>Contributing Risk Dimensions & Weightings</h2>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "14px", marginBottom: "28px" }}>
-        {factors.map((f, idx) => {
-          const isGood = f.score >= 80;
-          const isWarn = f.score >= 50 && f.score < 80;
-          const color = isGood ? "#72dcb5" : isWarn ? "#ffbd7c" : "#ff8c9c";
-          const bg = isGood ? "#1c3830" : isWarn ? "#3b2f24" : "#4a2432";
+      {factors.length === 0 ? (
+        <div style={{ padding: "20px", background: "#111729", border: "1px solid #20283b", borderRadius: "10px", color: "#818ba5", fontSize: "11px", textAlign: "center", marginBottom: "28px" }}>
+          No risk dimensions calculated yet. Add milestones, deadlines, and task estimates to populate factor analysis.
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "14px", marginBottom: "28px" }}>
+          {factors.map((f, idx) => {
+            const isGood = f.score >= 80;
+            const isWarn = f.score >= 50 && f.score < 80;
+            const color = isGood ? "#72dcb5" : isWarn ? "#ffbd7c" : "#ff8c9c";
+            const bg = isGood ? "#1c3830" : isWarn ? "#3b2f24" : "#4a2432";
 
-          return (
-            <div key={idx} className="panel" style={{ background: "#111729", padding: "16px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                <strong style={{ fontSize: "12px", color: "#e8ebf5" }}>{f.name}</strong>
-                <span style={{ fontSize: "9px", padding: "2px 6px", borderRadius: "4px", background: bg, color }}>
-                  {f.impact}
-                </span>
+            return (
+              <div key={idx} className="panel" style={{ background: "#111729", padding: "16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                  <strong style={{ fontSize: "12px", color: "#e8ebf5" }}>{f.name}</strong>
+                  <span style={{ fontSize: "9px", padding: "2px 6px", borderRadius: "4px", background: bg, color }}>
+                    {f.impact}
+                  </span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "6px" }}>
+                  <span style={{ color: "#818ba5" }}>Score:</span>
+                  <strong style={{ color }}>{f.score} / 100</strong>
+                </div>
+                <div style={{ height: "4px", background: "#20283b", borderRadius: "3px", overflow: "hidden", marginBottom: "10px" }}>
+                  <div style={{ height: "100%", width: `${f.score}%`, background: color }} />
+                </div>
+                <p style={{ fontSize: "10px", color: "#818ba5", margin: 0, lineHeight: "1.4" }}>{f.detail}</p>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "6px" }}>
-                <span style={{ color: "#818ba5" }}>Score:</span>
-                <strong style={{ color }}>{f.score} / 100</strong>
-              </div>
-              <div style={{ height: "4px", background: "#20283b", borderRadius: "3px", overflow: "hidden", marginBottom: "10px" }}>
-                <div style={{ height: "100%", width: `${f.score}%`, background: color }} />
-              </div>
-              <p style={{ fontSize: "10px", color: "#818ba5", margin: 0, lineHeight: "1.4" }}>{f.detail}</p>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Actionable Recommendations List */}
       <h2 style={{ fontSize: "14px", marginBottom: "14px" }}>Prioritized Actionable Next Steps</h2>
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-        {recommendations.map((rec) => (
+        {recommendations.length === 0 ? (
+          <div style={{ padding: "20px", background: "#111729", border: "1px solid #20283b", borderRadius: "10px", color: "#818ba5", fontSize: "11px", textAlign: "center" }}>
+            No pending risk mitigation actions. Project trajectory is clear.
+          </div>
+        ) : (
+          recommendations.map((rec) => (
           <div
             key={rec.id}
             className="panel"
@@ -188,8 +203,9 @@ export default function HealthInsightsPage({ setActiveNav }) {
             >
               Resolve in {rec.category} →
             </button>
-          </div>
-        ))}
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

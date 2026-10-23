@@ -74,12 +74,12 @@ export default function Sidebar({ activeNav, setActiveNav, mobileNav, setMobileN
             onClick={() => setShowProjectDropdown(!showProjectDropdown)}
             title="Switch project"
           >
-            <div className="workspace-logo">{activeProject?.code?.slice(0, 2) || "TP"}</div>
+            <div className="workspace-logo">{activeProject?.code?.slice(0, 2) || (activeProject?.name ? activeProject.name.slice(0, 2).toUpperCase() : "TP")}</div>
             <div className="workspace-label">
               <strong style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {activeProject?.name || "TechTrix Workspace"}
+                {activeProject?.name || "Select Project"}
               </strong>
-              <small>{activeProject?.status || "Active"}</small>
+              <small>{activeProject?.status || "Workspace"}</small>
             </div>
             <ChevronDown size={16} className="muted-icon" />
           </button>
@@ -212,11 +212,11 @@ export default function Sidebar({ activeNav, setActiveNav, mobileNav, setMobileN
 
           <div className="profile-row">
             <span className={`avatar avatar-${user?.avatarColor || "blue"}`}>
-              {user?.initials || "AK"}
+              {user?.initials || (user?.name ? user.name.slice(0, 2).toUpperCase() : "U")}
             </span>
             <div className="profile-info">
-              <strong>{user?.name || "Ankit Kumar"}</strong>
-              <small>{user?.title || "Project Lead"}</small>
+              <strong>{user?.name || "Member"}</strong>
+              <small>{user?.title || "Team Member"}</small>
             </div>
             <button
               className="icon-button"
