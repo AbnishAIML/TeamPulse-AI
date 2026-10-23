@@ -9,14 +9,17 @@ export const getProjectHealth = async (req: AuthenticatedRequest, res: Response)
   try {
     const { projectId } = req.params;
 
-    const project = await Project.findById(projectId);
+    const project = await Project.findById(projectId, "members.weeklyCapacityHours").lean();
     if (!project) {
       res.status(404).json({ success: false, message: "Project not found." });
       return;
     }
 
-    const tasks = await Task.find({ projectId });
-    const milestones = await Milestone.find({ projectId });
+    const tasks = await Task.find(
+      { projectId },
+      "status deadline priority blocker.isBlocked review.status remainingHours estimatedHours"
+    ).lean();
+    const milestones = await Milestone.find({ projectId }, "status dueDate progressPct").lean();
 
     const now = new Date();
     const totalTasks = tasks.length;

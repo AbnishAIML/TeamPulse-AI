@@ -24,23 +24,55 @@ export const getProjects = async (req: AuthenticatedRequest, res: Response): Pro
     const projects = await Project.find(query)
       .populate("ownerId", "name email initials avatarColor")
       .populate("members.userId", "name email initials avatarColor title weeklyCapacityHours")
-      .sort({ updatedAt: -1 });
+      .sort({ updatedAt: -1 })
+      .lean();
 
-    const enhancedProjects = await Promise.all(
-      projects.map(async (p) => {
-        const taskCount = await Task.countDocuments({ projectId: p._id });
-        const completedTaskCount = await Task.countDocuments({ projectId: p._id, status: "Done" });
-        const milestoneCount = await Milestone.countDocuments({ projectId: p._id });
+    const projectIds = projects.map((p) => p._id);
 
-        return {
-          ...p.toObject(),
-          totalTasks: taskCount,
-          completedTasks: completedTaskCount,
-          totalMilestones: milestoneCount,
-          completionRate: taskCount > 0 ? Math.round((completedTaskCount / taskCount) * 100) : 0,
-        };
-      })
-    );
+    // Batch aggregate task and milestone metrics in 2 constant queries instead of 3N queries
+    const [taskStats, milestoneStats] = await Promise.all([
+      Task.aggregate([
+        { $match: { projectId: { $in: projectIds } } },
+        {
+          $group: {
+            _id: "$projectId",
+            totalTasks: { $sum: 1 },
+            completedTasks: {
+              $sum: { $cond: [{ $eq: ["$status", "Done"] }, 1, 0] },
+            },
+          },
+        },
+      ]),
+      Milestone.aggregate([
+        { $match: { projectId: { $in: projectIds } } },
+        {
+          $group: {
+            _id: "$projectId",
+            totalMilestones: { $sum: 1 },
+          },
+        },
+      ]),
+    ]);
+
+    const taskStatMap = new Map(taskStats.map((s) => [s._id.toString(), s]));
+    const milestoneStatMap = new Map(milestoneStats.map((s) => [s._id.toString(), s.totalMilestones]));
+
+    const enhancedProjects = projects.map((p) => {
+      const pIdStr = p._id.toString();
+      const tStat = taskStatMap.get(pIdStr) || { totalTasks: 0, completedTasks: 0 };
+      const mCount = milestoneStatMap.get(pIdStr) || 0;
+      const totalTasks = tStat.totalTasks;
+      const completedTasks = tStat.completedTasks;
+      const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+      return {
+        ...p,
+        totalTasks,
+        completedTasks,
+        totalMilestones: mCount,
+        completionRate,
+      };
+    });
 
     res.json({ success: true, projects: enhancedProjects });
   } catch (error: any) {

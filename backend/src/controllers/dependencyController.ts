@@ -11,13 +11,13 @@ export const getProjectDependencies = async (req: AuthenticatedRequest, res: Res
   try {
     const { projectId } = req.params;
 
-    const project = await Project.findById(projectId);
+    const project = await Project.findById(projectId).select("_id").lean();
     if (!project) {
       res.status(404).json({ success: false, message: "Project not found." });
       return;
     }
 
-    const tasks = await Task.find({ projectId }).populate("assigneeId", "name");
+    const tasks = await Task.find({ projectId }).populate("assigneeId", "name").lean();
 
     const taskPayloads = tasks.map((t) => ({
       id: t._id.toString(),
@@ -58,13 +58,13 @@ export const simulateTaskDelay = async (req: AuthenticatedRequest, res: Response
       return;
     }
 
-    const project = await Project.findById(projectId);
+    const project = await Project.findById(projectId).select("_id").lean();
     if (!project) {
       res.status(404).json({ success: false, message: "Project not found." });
       return;
     }
 
-    const tasks = await Task.find({ projectId }).populate("assigneeId", "name");
+    const tasks = await Task.find({ projectId }).populate("assigneeId", "name").lean();
     const taskPayloads = tasks.map((t) => ({
       id: t._id.toString(),
       title: t.title,
@@ -127,7 +127,10 @@ export const addDependency = async (req: AuthenticatedRequest, res: Response): P
     }
 
     // Pre-flight cycle check
-    const allTasks = await Task.find({ projectId: task.projectId });
+    const allTasks = await Task.find(
+      { projectId: task.projectId },
+      "title status priority estimatedHours remainingHours actualHours dependencies"
+    ).lean();
     const simulatedPayloads = allTasks.map((t) => {
       const deps = t.dependencies.map((d) => d.toString());
       if (t._id.toString() === taskId) {

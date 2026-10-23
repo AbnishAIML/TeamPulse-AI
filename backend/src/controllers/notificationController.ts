@@ -16,7 +16,8 @@ export const getNotifications = async (req: AuthenticatedRequest, res: Response)
       .populate("projectId", "name code")
       .populate("taskId", "title priority status")
       .sort({ createdAt: -1 })
-      .limit(50);
+      .limit(50)
+      .lean();
 
     const unreadCount = await Notification.countDocuments({ recipientId: userId, isRead: false });
 
@@ -34,7 +35,7 @@ export const markAsRead = async (req: AuthenticatedRequest, res: Response): Prom
       { _id: notificationId, recipientId: req.user!._id },
       { isRead: true },
       { new: true }
-    );
+    ).lean();
 
     if (!notification) {
       res.status(404).json({ success: false, message: "Notification not found." });

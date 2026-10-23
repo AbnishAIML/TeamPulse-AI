@@ -8,13 +8,27 @@ export const getMilestones = async (req: AuthenticatedRequest, res: Response): P
   try {
     const { projectId } = req.params;
 
-    const milestones = await Milestone.find({ projectId }).sort({ dueDate: 1 });
+    const [milestones, allTasks] = await Promise.all([
+      Milestone.find({ projectId }).sort({ dueDate: 1 }),
+      Task.find({ projectId }).select("milestoneId status").lean(),
+    ]);
+
+    const tasksByMilestone = new Map<string, { total: number; done: number }>();
+    for (const t of allTasks) {
+      if (t.milestoneId) {
+        const mIdStr = (t.milestoneId as any)._id?.toString() || t.milestoneId.toString();
+        const stat = tasksByMilestone.get(mIdStr) || { total: 0, done: 0 };
+        stat.total += 1;
+        if (t.status === "Done") stat.done += 1;
+        tasksByMilestone.set(mIdStr, stat);
+      }
+    }
 
     const enriched = await Promise.all(
       milestones.map(async (m) => {
-        const tasks = await Task.find({ milestoneId: m._id });
-        const total = tasks.length;
-        const done = tasks.filter((t) => t.status === "Done").length;
+        const stat = tasksByMilestone.get(m._id.toString()) || { total: 0, done: 0 };
+        const total = stat.total;
+        const done = stat.done;
         const calculatedProgress = total > 0 ? Math.round((done / total) * 100) : m.progressPct;
 
         // Auto update progress in db if changed

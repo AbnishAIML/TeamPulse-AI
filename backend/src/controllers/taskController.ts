@@ -22,7 +22,7 @@ const VALID_STATUSES: TaskStatus[] = [
 const syncMilestoneProgress = async (milestoneId?: any): Promise<void> => {
   if (!milestoneId) return;
   try {
-    const tasks = await Task.find({ milestoneId });
+    const tasks = await Task.find({ milestoneId }, "status").lean();
     const total = tasks.length;
     if (total === 0) return;
 
@@ -50,7 +50,7 @@ const syncMilestoneProgress = async (milestoneId?: any): Promise<void> => {
 };
 
 const getPredecessorTasks = async (taskId: string, explicitDeps: any[] = []): Promise<any[]> => {
-  const depDocs = await TaskDependency.find({ successorId: taskId });
+  const depDocs = await TaskDependency.find({ successorId: taskId }).lean();
   const allPredIds = Array.from(
     new Set([
       ...explicitDeps.map((d: any) => d._id?.toString() || d.toString()),
@@ -58,7 +58,7 @@ const getPredecessorTasks = async (taskId: string, explicitDeps: any[] = []): Pr
     ])
   );
   if (allPredIds.length === 0) return [];
-  return Task.find({ _id: { $in: allPredIds } });
+  return Task.find({ _id: { $in: allPredIds } }).lean();
 };
 
 export const getTasks = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -91,7 +91,8 @@ export const getTasks = async (req: AuthenticatedRequest, res: Response): Promis
       .populate("assigneeId", "name email initials avatarColor title")
       .populate("milestoneId", "title dueDate status")
       .populate("dependencies", "title status deadline priority")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.json({ success: true, tasks });
   } catch (error: any) {
@@ -108,7 +109,8 @@ export const getTaskById = async (req: AuthenticatedRequest, res: Response): Pro
       .populate("milestoneId", "title dueDate status")
       .populate("dependencies", "title status deadline priority assigneeId")
       .populate("blocker.reportedBy", "name initials avatarColor")
-      .populate("review.reviewerId", "name initials avatarColor");
+      .populate("review.reviewerId", "name initials avatarColor")
+      .lean();
 
     if (!task) {
       res.status(404).json({ success: false, message: "Task not found." });
@@ -119,7 +121,9 @@ export const getTaskById = async (req: AuthenticatedRequest, res: Response): Pro
     const successors = await Task.find(
       { dependencies: task._id },
       "title status priority deadline assigneeId"
-    ).populate("assigneeId", "name initials avatarColor");
+    )
+      .populate("assigneeId", "name initials avatarColor")
+      .lean();
 
     res.json({ success: true, task, successors });
   } catch (error: any) {

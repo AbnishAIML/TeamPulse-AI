@@ -23,15 +23,18 @@ class DependencyGraph:
         Detects if there is any cycle in the dependency graph.
         Returns (has_cycle, cycle_nodes)
         """
+        if nx.is_directed_acyclic_graph(self.graph):
+            return False, []
+
         try:
-            # Check for simple cycles
+            # Check for simple cycles when graph is known to be cyclic
             cycles = list(nx.simple_cycles(self.graph))
             if cycles:
                 flat_cycle = list(set([node for cycle in cycles for node in cycle]))
                 return True, flat_cycle
-            return False, []
+            return True, []
         except Exception:
-            return not nx.is_directed_acyclic_graph(self.graph), []
+            return True, []
 
     def get_topological_order(self) -> List[str]:
         """

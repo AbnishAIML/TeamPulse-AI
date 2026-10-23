@@ -13,7 +13,8 @@ export const getTaskAttachments = async (req: AuthenticatedRequest, res: Respons
 
     const attachments = await Attachment.find({ taskId })
       .populate("uploaderId", "name initials avatarColor")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.json({ success: true, attachments });
   } catch (error: any) {
@@ -48,7 +49,7 @@ export const uploadAttachment = async (req: AuthenticatedRequest, res: Response)
       filePath: file.path,
     });
 
-    const populated = await Attachment.findById(attachment._id).populate("uploaderId", "name initials avatarColor");
+    const populated = await Attachment.findById(attachment._id).populate("uploaderId", "name initials avatarColor").lean();
 
     emitToProject(task.projectId.toString(), "attachment:added", populated);
 

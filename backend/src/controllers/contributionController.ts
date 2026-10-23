@@ -10,15 +10,18 @@ export const getProjectContributions = async (req: AuthenticatedRequest, res: Re
   try {
     const { projectId } = req.params;
 
-    const project = await Project.findById(projectId).populate("members.userId", "name");
+    const project = await Project.findById(projectId).populate("members.userId", "name").lean();
     if (!project) {
       res.status(404).json({ success: false, message: "Project not found." });
       return;
     }
 
-    const tasks = await Task.find({ projectId });
-    const activities = await ActivityEvent.find({ projectId });
-    const comments = await Comment.find({ projectId });
+    const tasks = await Task.find(
+      { projectId },
+      "assigneeId status actualHours estimatedHours deadline completedAt"
+    ).lean();
+    const activities = await ActivityEvent.find({ projectId }, "actorId eventType").lean();
+    const comments = await Comment.find({ projectId }, "authorId").lean();
 
     const memberActivityPayloads = project.members.map((m: any) => {
       const uId = m.userId._id.toString();
@@ -99,7 +102,8 @@ export const getProjectActivity = async (req: AuthenticatedRequest, res: Respons
       .populate("actorId", "name initials avatarColor")
       .populate("taskId", "title priority status")
       .sort({ createdAt: -1 })
-      .limit(limit);
+      .limit(Math.min(limit, 100))
+      .lean();
 
     res.json({ success: true, activities });
   } catch (error: any) {

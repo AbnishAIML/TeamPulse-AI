@@ -12,13 +12,13 @@ export const getProjectWorkload = async (req: AuthenticatedRequest, res: Respons
   try {
     const { projectId } = req.params;
 
-    const project = await Project.findById(projectId).populate("members.userId", "name weeklyCapacityHours skills");
+    const project = await Project.findById(projectId).populate("members.userId", "name weeklyCapacityHours skills").lean();
     if (!project) {
       res.status(404).json({ success: false, message: "Project not found." });
       return;
     }
 
-    const tasks = await Task.find({ projectId }).populate("assigneeId", "name");
+    const tasks = await Task.find({ projectId }).populate("assigneeId", "name").lean();
 
     const membersPayload = project.members.map((m: any) => ({
       user_id: m.userId._id.toString(),

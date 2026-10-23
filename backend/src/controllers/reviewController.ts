@@ -46,7 +46,7 @@ export const requestReview = async (req: AuthenticatedRequest, res: Response): P
     });
 
     // Notify project reviewers & managers
-    const project = await Project.findById(task.projectId);
+    const project = await Project.findById(task.projectId, "members").lean();
     if (project) {
       const reviewers = project.members
         .filter((m) => m.role === "Reviewer" || m.role === "Project Manager" || m.role === "Project Owner")
@@ -201,7 +201,8 @@ export const reviewDecision = async (req: AuthenticatedRequest, res: Response): 
       .populate("assigneeId", "name email initials avatarColor")
       .populate("milestoneId", "title dueDate status")
       .populate("dependencies", "title status deadline")
-      .populate("review.reviewerId", "name initials avatarColor");
+      .populate("review.reviewerId", "name initials avatarColor")
+      .lean();
 
     emitToProject(task.projectId.toString(), "task:updated", populated);
 

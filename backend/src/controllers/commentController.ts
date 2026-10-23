@@ -11,7 +11,8 @@ export const getTaskComments = async (req: AuthenticatedRequest, res: Response):
 
     const comments = await Comment.find({ taskId })
       .populate("authorId", "name initials avatarColor title")
-      .sort({ createdAt: 1 });
+      .sort({ createdAt: 1 })
+      .lean();
 
     res.json({ success: true, comments });
   } catch (error: any) {
@@ -42,7 +43,7 @@ export const addComment = async (req: AuthenticatedRequest, res: Response): Prom
       text: text.trim(),
     });
 
-    const populated = await Comment.findById(comment._id).populate("authorId", "name initials avatarColor title");
+    const populated = await Comment.findById(comment._id).populate("authorId", "name initials avatarColor title").lean();
 
     await logActivity({
       projectId: task.projectId,

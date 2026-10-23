@@ -22,10 +22,11 @@ export const getReportSummary = async (req: AuthenticatedRequest, res: Response)
     const tasks = await Task.find(taskQuery)
       .populate("assigneeId", "name email title")
       .populate("milestoneId", "title dueDate status")
-      .sort({ deadline: 1 });
+      .sort({ deadline: 1 })
+      .lean();
 
-    const milestones = await Milestone.find({ projectId }).sort({ dueDate: 1 });
-    const activities = await ActivityEvent.find({ projectId }).limit(50);
+    const milestones = await Milestone.find({ projectId }).sort({ dueDate: 1 }).lean();
+    const activities = await ActivityEvent.find({ projectId }).select("_id").limit(50).lean();
 
     const now = new Date();
     const totalTasks = tasks.length;
@@ -70,14 +71,14 @@ export const exportReportCSV = async (req: AuthenticatedRequest, res: Response):
     const { projectId } = req.params;
     const { type } = req.query; // "tasks" | "milestones" | "blockers"
 
-    const project = await Project.findById(projectId);
+    const project = await Project.findById(projectId).select("code").lean();
     if (!project) {
       res.status(404).json({ success: false, message: "Project not found." });
       return;
     }
 
     if (type === "milestones") {
-      const milestones = await Milestone.find({ projectId }).sort({ dueDate: 1 });
+      const milestones = await Milestone.find({ projectId }).sort({ dueDate: 1 }).lean();
       let csv = "Title,Status,Due Date,Progress,Completion Criteria\n";
       milestones.forEach((m) => {
         const criteria = `"${(m.completionCriteria || []).join("; ").replace(/"/g, '""')}"`;
@@ -94,7 +95,8 @@ export const exportReportCSV = async (req: AuthenticatedRequest, res: Response):
     const tasks = await Task.find({ projectId })
       .populate("assigneeId", "name")
       .populate("milestoneId", "title")
-      .sort({ deadline: 1 });
+      .sort({ deadline: 1 })
+      .lean();
 
     let csv = "ID,Title,Assignee,Milestone,Priority,Status,Deadline,Est Hours,Rem Hours,Actual Hours,Blocked,Review Status\n";
     tasks.forEach((t: any) => {
