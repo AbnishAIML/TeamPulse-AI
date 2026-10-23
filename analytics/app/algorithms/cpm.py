@@ -1,6 +1,6 @@
 from typing import List, Dict, Tuple, Set, Optional
 import networkx as nx
-from ..models.dependency_models import TaskNode, CPMTaskMetrics
+from ..models.dependency_models import TaskNode, CPMTaskMetrics, AffectedTaskDetail
 
 def calculate_cpm(tasks: List[TaskNode], graph: nx.DiGraph) -> Tuple[Dict[str, CPMTaskMetrics], List[str], float]:
     """
@@ -42,7 +42,6 @@ def calculate_cpm(tasks: List[TaskNode], graph: nx.DiGraph) -> Tuple[Dict[str, C
     for t_id in topo_order:
         t = tasks_dict.get(t_id)
         if t:
-            # If done, remaining duration is 0
             if t.status == "Done":
                 durations[t_id] = 0.0
             else:
@@ -83,7 +82,6 @@ def calculate_cpm(tasks: List[TaskNode], graph: nx.DiGraph) -> Tuple[Dict[str, C
 
     for node in topo_order:
         slack = round(ls[node] - es[node], 2)
-        # Avoid float precision issues
         if abs(slack) < 0.01:
             slack = 0.0
         is_crit = (slack == 0.0 and durations[node] > 0)
@@ -113,3 +111,58 @@ def calculate_cpm(tasks: List[TaskNode], graph: nx.DiGraph) -> Tuple[Dict[str, C
         )
 
     return metrics_map, critical_path, round(total_project_duration, 1)
+
+def simulate_delay_propagation(
+    tasks: List[TaskNode],
+    delayed_task_id: str,
+    delay_hours: float
+) -> Tuple[float, float, float, List[AffectedTaskDetail], List[str]]:
+    """
+    Simulates the cascading schedule impact of a delay on a specific task.
+    Returns:
+    (original_duration, new_duration, schedule_slippage, affected_tasks, new_critical_path)
+    """
+    from .dag import DependencyGraph
+
+    dag = DependencyGraph(tasks)
+    orig_metrics, orig_crit, orig_duration = calculate_cpm(tasks, dag.graph)
+
+    # Build simulated task list with the added delay on delayed_task_id
+    simulated_tasks: List[TaskNode] = []
+    for t in tasks:
+        t_copy = t.model_copy()
+        if t.id == delayed_task_id:
+            current_rem = t.remaining_hours if t.remaining_hours > 0 else (t.estimated_hours or 2.0)
+            t_copy.remaining_hours = current_rem + delay_hours
+            t_copy.estimated_hours = (t.estimated_hours or 0.0) + delay_hours
+        simulated_tasks.append(t_copy)
+
+    sim_dag = DependencyGraph(simulated_tasks)
+    new_metrics, new_crit, new_duration = calculate_cpm(simulated_tasks, sim_dag.graph)
+
+    slippage = round(max(0.0, new_duration - orig_duration), 1)
+
+    affected_tasks: List[AffectedTaskDetail] = []
+    tasks_dict = {t.id: t for t in tasks}
+
+    for t_id, new_m in new_metrics.items():
+        orig_m = orig_metrics.get(t_id)
+        if orig_m:
+            shift = round(new_m.early_finish - orig_m.early_finish, 1)
+            if shift > 0.05 or t_id == delayed_task_id:
+                task_title = tasks_dict[t_id].title if t_id in tasks_dict else t_id
+                affected_tasks.append(AffectedTaskDetail(
+                    task_id=t_id,
+                    task_title=task_title,
+                    original_early_start=orig_m.early_start,
+                    new_early_start=new_m.early_start,
+                    original_early_finish=orig_m.early_finish,
+                    new_early_finish=new_m.early_finish,
+                    delay_shift_hours=shift,
+                    is_critical=new_m.is_critical
+                ))
+
+    # Sort affected tasks by new early start
+    affected_tasks.sort(key=lambda x: x.new_early_start)
+
+    return orig_duration, new_duration, slippage, affected_tasks, new_crit

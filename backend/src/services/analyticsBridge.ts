@@ -43,6 +43,30 @@ export class AnalyticsBridge {
     }
   }
 
+  public static async simulateDelayPropagation(
+    projectId: string,
+    tasks: TaskPayload[],
+    delayedTaskId: string,
+    delayHours: number
+  ): Promise<any> {
+    try {
+      const response = await axios.post(
+        `${this.baseURL}/delay-propagation`,
+        {
+          project_id: projectId,
+          tasks,
+          delayed_task_id: delayedTaskId,
+          delay_hours: delayHours,
+        },
+        { timeout: 3500 }
+      );
+      return response.data;
+    } catch (err: any) {
+      console.warn("[AnalyticsBridge] FastAPI unavailable or timed out, executing native TypeScript delay propagation fallback...");
+      return this.fallbackDelayPropagation(projectId, tasks, delayedTaskId, delayHours);
+    }
+  }
+
   public static async analyzeWorkload(
     projectId: string,
     members: MemberPayload[],
@@ -305,6 +329,69 @@ export class AnalyticsBridge {
       at_risk_tasks: atRiskTasks,
       cpm_metrics: cpmMetrics,
       summary: `Analyzed ${tasks.length} tasks. Identified ${blockedTasks.length} blocked task(s) and critical path of ${criticalPath.length} task(s).`,
+    };
+  }
+
+  public static fallbackDelayPropagation(
+    projectId: string,
+    tasks: TaskPayload[],
+    delayedTaskId: string,
+    delayHours: number
+  ): any {
+    const origAnalysis = this.fallbackDependencyAnalysis(projectId, tasks);
+    const origDuration = origAnalysis.project_duration_hours;
+    const origMetrics = origAnalysis.cpm_metrics;
+
+    // Simulate delay
+    const simTasks = tasks.map((t) => {
+      if (t.id === delayedTaskId) {
+        return {
+          ...t,
+          remaining_hours: (t.remaining_hours || t.estimated_hours || 2) + delayHours,
+          estimated_hours: (t.estimated_hours || 0) + delayHours,
+        };
+      }
+      return { ...t };
+    });
+
+    const newAnalysis = this.fallbackDependencyAnalysis(projectId, simTasks);
+    const newDuration = newAnalysis.project_duration_hours;
+    const newMetrics = newAnalysis.cpm_metrics;
+    const slippage = Math.round(Math.max(0, newDuration - origDuration) * 10) / 10;
+
+    const affectedTasks: any[] = [];
+    tasks.forEach((t) => {
+      const origM = origMetrics[t.id];
+      const newM = newMetrics[t.id];
+      if (origM && newM) {
+        const shift = Math.round((newM.early_finish - origM.early_finish) * 10) / 10;
+        if (shift > 0.05 || t.id === delayedTaskId) {
+          affectedTasks.push({
+            task_id: t.id,
+            task_title: t.title,
+            original_early_start: origM.early_start,
+            new_early_start: newM.early_start,
+            original_early_finish: origM.early_finish,
+            new_early_finish: newM.early_finish,
+            delay_shift_hours: shift,
+            is_critical: newM.is_critical,
+          });
+        }
+      }
+    });
+
+    affectedTasks.sort((a, b) => a.new_early_start - b.new_early_start);
+
+    return {
+      project_id: projectId,
+      delayed_task_id: delayedTaskId,
+      delay_hours: delayHours,
+      original_duration_hours: origDuration,
+      new_duration_hours: newDuration,
+      schedule_slippage_hours: slippage,
+      affected_tasks: affectedTasks,
+      critical_path: newAnalysis.critical_path,
+      summary: `Simulated delay of ${delayHours}h on task '${delayedTaskId}'. Affected ${affectedTasks.length} task(s). Project duration shifts from ${origDuration}h to ${newDuration}h (net slippage: ${slippage}h).`,
     };
   }
 

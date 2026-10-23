@@ -58,3 +58,30 @@ class DependencyAnalysisResponse(BaseModel):
     at_risk_tasks: List[BlockedTaskDetail] = Field(default_factory=list)
     cpm_metrics: Dict[str, CPMTaskMetrics] = Field(default_factory=dict)
     summary: str
+
+class AffectedTaskDetail(BaseModel):
+    task_id: str
+    task_title: str
+    original_early_start: float
+    new_early_start: float
+    original_early_finish: float
+    new_early_finish: float
+    delay_shift_hours: float
+    is_critical: bool
+
+class DelayPropagationRequest(BaseModel):
+    project_id: str
+    tasks: List[TaskNode]
+    delayed_task_id: str
+    delay_hours: float
+
+class DelayPropagationResponse(BaseModel):
+    project_id: str
+    delayed_task_id: str
+    delay_hours: float
+    original_duration_hours: float
+    new_duration_hours: float
+    schedule_slippage_hours: float
+    affected_tasks: List[AffectedTaskDetail] = Field(default_factory=list)
+    critical_path: List[str] = Field(default_factory=list)
+    summary: str

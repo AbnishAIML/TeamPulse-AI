@@ -48,6 +48,56 @@ export const getProjectDependencies = async (req: AuthenticatedRequest, res: Res
   }
 };
 
+export const simulateTaskDelay = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { projectId } = req.params;
+    const { delayedTaskId, delayHours } = req.body;
+
+    if (!delayedTaskId || delayHours === undefined) {
+      res.status(400).json({ success: false, message: "delayedTaskId and delayHours are required." });
+      return;
+    }
+
+    const project = await Project.findById(projectId);
+    if (!project) {
+      res.status(404).json({ success: false, message: "Project not found." });
+      return;
+    }
+
+    const tasks = await Task.find({ projectId }).populate("assigneeId", "name");
+    const taskPayloads = tasks.map((t) => ({
+      id: t._id.toString(),
+      title: t.title,
+      status: t.status,
+      priority: t.priority,
+      estimated_hours: t.estimatedHours,
+      remaining_hours: t.remainingHours,
+      actual_hours: t.actualHours,
+      start_date: t.startDate?.toISOString(),
+      deadline: t.deadline?.toISOString(),
+      dependencies: t.dependencies.map((d: any) => d.toString()),
+      assignee_id: t.assigneeId ? (t.assigneeId as any)._id?.toString() || t.assigneeId.toString() : undefined,
+      assignee_name: t.assigneeId ? (t.assigneeId as any).name : undefined,
+      tags: t.tags,
+      is_blocked: t.blocker?.isBlocked || false,
+    }));
+
+    const simulation = await AnalyticsBridge.simulateDelayPropagation(
+      projectId,
+      taskPayloads,
+      delayedTaskId,
+      Number(delayHours)
+    );
+
+    res.json({
+      success: true,
+      simulation,
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: "Failed to simulate delay propagation.", error: error.message });
+  }
+};
+
 export const addDependency = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { taskId } = req.params;

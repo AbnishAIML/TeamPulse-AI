@@ -1,14 +1,18 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from typing import List, Dict, Any
 import uvicorn
 
 from .models.dependency_models import (
     DependencyAnalysisRequest,
-    DependencyAnalysisResponse
+    DependencyAnalysisResponse,
+    DelayPropagationRequest,
+    DelayPropagationResponse
 )
 from .models.workload_models import (
     WorkloadAnalysisRequest,
-    WorkloadAnalysisResponse
+    WorkloadAnalysisResponse,
+    RedistributionRecommendation
 )
 from .models.contribution_models import (
     ContributionAnalysisRequest,
@@ -19,14 +23,14 @@ from .models.health_models import (
     ProjectHealthResponse
 )
 from .algorithms.dag import DependencyGraph
-from .algorithms.cpm import calculate_cpm
+from .algorithms.cpm import calculate_cpm, simulate_delay_propagation
 from .services.workload_service import analyze_team_workload
 from .services.contribution_service import analyze_team_contributions
 from .services.health_service import evaluate_project_health
 
 app = FastAPI(
     title="TeamPulse AI Analytics Engine",
-    description="Intelligent analytics service for project management, DAG dependencies, CPM, workload balancing, and team contributions.",
+    description="Intelligent analytics service for CPM scheduling, delay propagation, workload balancing, team contributions, and project health.",
     version="1.0.0"
 )
 
@@ -51,6 +55,9 @@ def read_root():
 def health_check():
     return {"status": "ok", "service": "analytics"}
 
+# ==================== DEPENDENCIES & CRITICAL PATH ====================
+
+@app.post("/critical-path", response_model=DependencyAnalysisResponse)
 @app.post("/api/analytics/dependencies/analyze", response_model=DependencyAnalysisResponse)
 def analyze_dependencies(request: DependencyAnalysisRequest):
     """
@@ -101,6 +108,45 @@ def analyze_dependencies(request: DependencyAnalysisRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Dependency analysis failed: {str(e)}")
 
+# ==================== DELAY PROPAGATION ====================
+
+@app.post("/delay-propagation", response_model=DelayPropagationResponse)
+@app.post("/api/analytics/dependencies/delay-propagation", response_model=DelayPropagationResponse)
+def simulate_delay(request: DelayPropagationRequest):
+    """
+    Simulates propagating an upstream task delay through all dependent successors
+    in the project DAG and computes the total schedule slippage.
+    """
+    try:
+        orig_dur, new_dur, slippage, affected, crit = simulate_delay_propagation(
+            request.tasks,
+            request.delayed_task_id,
+            request.delay_hours
+        )
+
+        summary = (
+            f"Simulated delay of {request.delay_hours}h on task '{request.delayed_task_id}'. "
+            f"Affected {len(affected)} downstream task(s). Project duration shifts from "
+            f"{orig_dur}h to {new_dur}h (net slippage: {slippage}h)."
+        )
+
+        return DelayPropagationResponse(
+            project_id=request.project_id,
+            delayed_task_id=request.delayed_task_id,
+            delay_hours=request.delay_hours,
+            original_duration_hours=orig_dur,
+            new_duration_hours=new_dur,
+            schedule_slippage_hours=slippage,
+            affected_tasks=affected,
+            critical_path=crit,
+            summary=summary
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Delay propagation simulation failed: {str(e)}")
+
+# ==================== WORKLOAD & REDISTRIBUTION ====================
+
+@app.post("/workload", response_model=WorkloadAnalysisResponse)
 @app.post("/api/analytics/workload/analyze", response_model=WorkloadAnalysisResponse)
 def analyze_workload(request: WorkloadAnalysisRequest):
     """
@@ -111,6 +157,21 @@ def analyze_workload(request: WorkloadAnalysisRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Workload analysis failed: {str(e)}")
 
+@app.post("/redistribution", response_model=List[RedistributionRecommendation])
+@app.post("/api/analytics/workload/redistribute", response_model=List[RedistributionRecommendation])
+def get_redistribution_recommendations(request: WorkloadAnalysisRequest):
+    """
+    Generates intelligent task redistribution proposals to balance overloaded members.
+    """
+    try:
+        res = analyze_team_workload(request)
+        return res.recommendations
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Redistribution analysis failed: {str(e)}")
+
+# ==================== CONTRIBUTIONS ====================
+
+@app.post("/contribution", response_model=ContributionAnalysisResponse)
 @app.post("/api/analytics/contributions/analyze", response_model=ContributionAnalysisResponse)
 def analyze_contributions(request: ContributionAnalysisRequest):
     """
@@ -121,6 +182,9 @@ def analyze_contributions(request: ContributionAnalysisRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Contribution analysis failed: {str(e)}")
 
+# ==================== PROJECT HEALTH ====================
+
+@app.post("/project-health", response_model=ProjectHealthResponse)
 @app.post("/api/analytics/project-health/evaluate", response_model=ProjectHealthResponse)
 def evaluate_health(request: ProjectHealthRequest):
     """

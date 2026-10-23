@@ -11,3 +11,5 @@
 | Strict Section 2.1 RBAC with last-owner protection | Prevents accidental orphaned projects; restricts project metadata and member role mutation exclusively to Project Owners |
 | Gated HTTP 422 task transitions for finish-to-start predecessors & reviews | Prevents broken DAG workflows and enforces quality review gates before marking tasks Done |
 | Dual dependency storage (array + TaskDependency compound index) | Provides fast query lookups on tasks while ensuring referential integrity and cycle validation across the project DAG |
+| Topological forward-pass what-if delay propagation | Enables deterministic schedule slippage forecasting without altering persistent project task records |
+| Canonical endpoint aliasing (/critical-path, /delay-propagation, /workload, /redistribution, /contribution, /project-health) | Guarantees compliance with both legacy API client callers and the Stage 4 contract specification |
