@@ -6,6 +6,7 @@ import { Milestone } from "../models/Milestone.js";
 import { Notification } from "../models/Notification.js";
 import { TaskDependency } from "../models/TaskDependency.js";
 import { Review } from "../models/Review.js";
+import { Blocker } from "../models/Blocker.js";
 import { logActivity } from "../services/activityService.js";
 import { emitToProject, emitToUser } from "../services/socketService.js";
 
@@ -468,6 +469,15 @@ export const reportBlocker = async (req: AuthenticatedRequest, res: Response): P
 
     await task.save();
 
+    await Blocker.create({
+      taskId: task._id,
+      projectId: task.projectId,
+      reportedBy: req.user!._id,
+      severity: severity || "High",
+      description: reason || "Unspecified blocker",
+      status: "Open",
+    });
+
     await logActivity({
       projectId: task.projectId,
       taskId: task._id,
@@ -526,6 +536,11 @@ export const resolveBlocker = async (req: AuthenticatedRequest, res: Response): 
     task.status = "In Progress";
 
     await task.save();
+
+    await Blocker.findOneAndUpdate(
+      { taskId: task._id, status: "Open" },
+      { status: "Resolved", resolvedBy: req.user!._id, resolvedAt: new Date() }
+    );
 
     await logActivity({
       projectId: task.projectId,

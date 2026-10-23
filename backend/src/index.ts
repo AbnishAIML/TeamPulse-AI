@@ -22,6 +22,7 @@ import attachmentRoutes from "./routes/attachmentRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import invitationRoutes from "./routes/invitationRoutes.js";
+import { startAlertCron } from "./services/alertCronService.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -66,13 +67,24 @@ app.use("/api/invitations", invitationRoutes);
 // Centralized error handler
 app.use(errorHandler);
 
+server.on("error", (err: any) => {
+  if (err.code === "EADDRINUSE") {
+    console.warn(`[TeamPulse Backend] Port ${ENV.PORT} already in use; reusing running server.`);
+  } else {
+    console.error("[TeamPulse Backend] Server error:", err);
+  }
+});
+
 // Start server
 const startServer = async () => {
   await connectDB();
-  server.listen(ENV.PORT, () => {
-    console.log(`[TeamPulse Backend] Server running on http://localhost:${ENV.PORT}`);
-    console.log(`[TeamPulse Backend] Real-time Socket.IO connected and listening.`);
-  });
+  startAlertCron();
+  if (!server.listening && process.env.NODE_ENV !== "test") {
+    server.listen(ENV.PORT, () => {
+      console.log(`[TeamPulse Backend] Server running on http://localhost:${ENV.PORT}`);
+      console.log(`[TeamPulse Backend] Real-time Socket.IO connected and listening.`);
+    });
+  }
 };
 
 startServer();

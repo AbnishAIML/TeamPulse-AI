@@ -13,3 +13,6 @@
 | Dual dependency storage (array + TaskDependency compound index) | Provides fast query lookups on tasks while ensuring referential integrity and cycle validation across the project DAG |
 | Topological forward-pass what-if delay propagation | Enables deterministic schedule slippage forecasting without altering persistent project task records |
 | Canonical endpoint aliasing (/critical-path, /delay-propagation, /workload, /redistribution, /contribution, /project-health) | Guarantees compliance with both legacy API client callers and the Stage 4 contract specification |
+| Mongoose pre-hook audit enforcement on ActivityEvent | Guarantees strictly append-only audit trail at the model layer, rejecting any update or delete operation |
+| Sparse unique `dedupKey` index on Notification | Prevents duplicate notification spam for identical alert events on the same calendar day |
+| Dual synchronization between Task embedded state and Blocker/Review collections | Ensures atomic fast reads on tasks while maintaining normalized historical records for analytics |
