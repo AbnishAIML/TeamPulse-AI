@@ -23,9 +23,5 @@ export const ENV = {
   UPLOAD_DIR: process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads"),
   MAX_UPLOAD_MB: process.env.MAX_UPLOAD_MB ? parseInt(process.env.MAX_UPLOAD_MB, 10) : 10,
   ALLOWED_MIME_TYPES: (process.env.ALLOWED_MIME_TYPES || "image/jpeg,image/png,image/webp,application/pdf,text/plain,application/zip").split(","),
-  SMTP_HOST: process.env.SMTP_HOST || "",
-  SMTP_PORT: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587,
-  SMTP_USER: process.env.SMTP_USER || "",
-  SMTP_PASS: process.env.SMTP_PASS || "",
-  SMTP_FROM: process.env.SMTP_FROM || "no-reply@teampulse.ai",
 };
+
